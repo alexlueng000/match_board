@@ -1,0 +1,45 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/ranking/ranking",
+    "pages/rewards/rewards",
+    "pages/me/me",
+    "pages/login/login",
+    "pages/reward-detail/reward-detail",
+    "pages/sessions/sessions"
+  ],
+  "window": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "27Nuts 智力竞技馆",
+    "navigationBarBackgroundColor": "#0c0c0c",
+    "backgroundColor": "#0c0c0c",
+    "backgroundTextStyle": "light",
+    "enablePullDownRefresh": true
+  },
+  "tabBar": {
+    "color": "#8e8065",
+    "selectedColor": "#efd097",
+    "backgroundColor": "#10100f",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/ranking/ranking",
+        "text": "排行"
+      },
+      {
+        "pagePath": "pages/rewards/rewards",
+        "text": "奖励"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "miniprogram-ts-quickstart",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev:admin": "npm --prefix frontend run dev",
+    "build:admin": "npm --prefix frontend run build",
+    "typecheck:admin": "npm --prefix frontend run typecheck",
+    "up": "docker compose up --build -d",
+    "typecheck:mini": "frontend/node_modules/.bin/tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "",
+  "dependencies": {},
+  "devDependencies": {
+    "miniprogram-api-typings": "^2.8.3-1"
+  }
+}

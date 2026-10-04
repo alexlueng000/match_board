@@ -1,0 +1,75 @@
+# 27Nuts 管理后台
+
+Next.js 管理后台、原生微信 TypeScript 小程序、FastAPI API 和 MySQL，前后端独立部署。
+
+## 启动
+
+1. 复制 `.env.example` 为 `.env`，设置数据库密码、管理员密码（至少12位）和 JWT 密钥（至少32位）。数据库密码建议采用字母和数字，特殊字符需对 DATABASE_URL 做 URL 编码。
+2. 执行 `docker compose up --build -d`。
+3. 打开 http://localhost:3000，使用环境变量配置的管理员登录。API 文档：http://localhost:8000/docs。
+
+MySQL 使用持久化卷。不要执行 `docker compose down -v`，它会删除数据库。
+生产环境应设置实际 API 域名及 CORS_ORIGINS，以 HTTPS 反向代理暴露前后端；修改 NEXT_PUBLIC_API_URL 后重建前端。
+
+## 已实现
+
+- 管理员登录、8小时令牌、受保护的管理 API。
+- 运营统计、玩家创建与搜索、玩家详情及积分流水。
+- 常规赛和 GTO 赛事记分，事务发放积分和奖励，提交幂等。
+- 手动调分（原因必填）、月榜与总榜、按月份保存积分。
+- 奖励列表、补发、撤销、按码查询、原子核销，GTO两张门票独立核销。
+- 切换当前月赛，历史积分不删除。
+- 响应式中文界面、Docker Compose 部署。
+
+## 业务约定
+
+后台“奖品设置”管理奖品目录、启用状态、各名次发放奖品与份数（0–20）、可发放库存。新部署沿用原奖品规则，默认不限库存；实际库存由门店录入。GTO冠军的两种奖励方案均可配置，记分页面显示实际奖品与份数。手动补发可选择1–20份，每份独立生成核销码。
+
+有限库存于发放时预占，核销不再次扣减；未使用奖励撤销时退回预占库存。库存不足时比赛结果、积分、奖励和场次状态一起回滚。旧奖励没有预占库存标记，撤销不会凭空增加库存。设置保存携带库存版本，发放或其他管理员修改后旧页面不能覆盖新库存，需刷新再调整。库存模式变化、补货调整、奖品发放及撤销退回记录在库存流水中。奖品只能停用不能删除；修改名称和发放规则不改变已发奖励的记录。
+
+月积分归属比赛日期；手动调整时指定月份。前三名不能重复，27收池可与前三名重合。V1奖励永久有效，管理员可撤销未核销奖励。核销码为10位随机十六进制字符串，保持全库唯一。榜单包括零分与负分玩家。月榜同分按最后正向获分时间升序，时间相同时按积分流水顺序；总榜同分按玩家编号。扣分不更新最后获分时间。
+
+后台可以先创建线下玩家；小程序通过微信登录创建独立档案，不按昵称或公开会员号自动合并线下档案。线下旧档案绑定尚未实现。赛事暂不直接编辑，修正积分用反向流水、修正未使用奖励用撤销及补发，并填写原因。已核销记录不能删除。
+
+## 微信小程序
+
+### 比赛场次与参赛名单
+
+管理后台“比赛场次”创建场次（名称、常规赛/GTO、北京时间、人数上限3–500人），支持按日期查看。可提前创建未来场次，小程序只展示北京时间当天的场次，用户登录后加入或退出。重复加入不占额外名额，退出释放名额，满员时禁止新报名。
+
+店员根据用户出示的会员 ID 在名单中确认到场，点击“开始比赛”关闭报名和退出；已报名玩家仍可由管理员确认到场。结果只能从本场已到场名单选择，至少三位不同玩家获得前三名；27收池可与前三名重合。比赛类型和积分日期由场次确定。成功提交后，记分、奖励和场次结束在同一事务保存；重复提交不重复发放。场次可在报名中或进行中取消，取消后不能恢复，历史报名记录保留。已结束场次不能取消或重新记分。
+
+原“赛事记分”保留为独立手动记分入口，供历史或未创建场次的比赛使用。已创建场次的比赛应从“比赛场次”提交结果，避免另外录入一笔独立赛事。
+
+微信开发者工具导入项目根目录，使用 project.config.json 中的 AppID。页面包括首页、当日比赛、月榜/总榜、奖励中心、我的、登录和奖励详情；后台积分与奖励直接同步，只有管理员可以核销奖励。
+
+服务端 .env 配置 WECHAT_APP_ID 和 WECHAT_APP_SECRET，再重建 API 容器；AppSecret 只放服务端。未配置时登录返回明确提示，不使用模拟微信身份。miniprogram/services/api.ts 中 API_BASE 默认为 http://localhost:8000，仅供本机开发工具测试。上线时改为实际 HTTPS API 域名，并在微信平台配置 request 和 downloadFile 合法域名、隐私声明。真实手机无法通过 localhost 访问电脑。
+
+两张黑金原图由 API 的 /assets/mini/brand.png 和 /assets/mini/rewards.png 提供，避免放入小程序包。头像目前显示昵称首字，不读取微信头像。图1的固定卡片和图6的固定20行榜单作为设计参考，实际卡片与榜单由代码动态渲染。
+
+执行 npm run typecheck:mini 验证 TypeScript（需要先安装 frontend 依赖）。服务端测试覆盖微信身份重复登录、管理员/玩家权限隔离、奖励归属和核销后隐藏核销码；测试替换微信换码服务，不能替代真实微信登录验收。发布前还须在微信开发者工具与真机验证页面、安全区、素材加载及真实登录。
+
+## 本地开发与验证
+
+本地环境使用 Node.js 22 和 Python 3.10+；Docker 已固定使用 Node.js 22、Python 3.12、MySQL 8.4。
+
+后端：创建虚拟环境，`pip install -r backend/requirements-all.txt`；设置 DATABASE_URL、JWT_SECRET、ADMIN_PASSWORD 后，从 backend 先运行 `alembic upgrade head`，再运行 `uvicorn app.main:app --reload`。
+前端：`cd frontend && npm ci && npm run dev`，NEXT_PUBLIC_API_URL 默认 http://localhost:8000。
+测试：从 backend 执行 `.venv/bin/python -m pytest -q`。设置 TEST_DATABASE_URL 可在**专用测试 MySQL 数据库**执行同套测试（测试会删建表，禁止指向业务数据库）。
+构建：`cd frontend && npm run typecheck && npm run build`。
+
+Docker API 启动先执行 Alembic 数据库迁移，再初始化管理员；后续启动不覆盖密码。新增数据库结构须创建并审查迁移文件，禁止对存量数据盲目重建。上线前备份数据库，并确认所在环境的域名、HTTPS 与账号配置。
+
+## 管理员维护
+
+部署后新增管理员：`docker compose exec api python -m app.manage create-admin staff`。
+重置密码：`docker compose exec api python -m app.manage reset-password admin`。
+命令交互输入密码，不回显；重置后原有令牌失效。连续5次错误密码将锁定该账号15分钟。
+所有赛事、积分流水与核销时间统一按 Asia/Shanghai 存储和展示。奖励撤销保留原始发放原因，另存撤销原因及操作人。
+
+前端操作测试：`cd frontend && npm test`，覆盖登录失败、GTO赛事发放与单张奖励核销。组件测试使用模拟 API；后端业务测试独立连接 MySQL。
+
+## 部署验证与备份
+
+服务启动后，在仓库根目录执行 `backend/.venv/bin/python scripts/smoke.py`，验证通过 Next.js 代理的健康检查、权限及各管理接口（从本地 `.env` 读取账号，不输出密码或令牌）。
+备份数据库：`docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction nuts' > nuts-backup.sql`。备份文件应放在安全位置，升级前先完成备份。
