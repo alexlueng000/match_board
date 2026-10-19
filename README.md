@@ -4,7 +4,7 @@ Next.js 管理后台、原生微信 TypeScript 小程序、FastAPI API 和 MySQL
 
 ## 启动
 
-1. 复制 `.env.example` 为 `.env`，设置数据库密码、管理员密码（至少12位）和 JWT 密钥（至少32位）。数据库密码建议采用字母和数字，特殊字符需对 DATABASE_URL 做 URL 编码。
+1. 复制 `.env.example` 为 `.env`，设置数据库密码、管理员密码（1至256位）和 JWT 密钥（至少32位）。数据库密码建议采用字母和数字，特殊字符需对 DATABASE_URL 做 URL 编码。
 2. 执行 `docker compose up --build -d`。
 3. 打开 http://localhost:3000，使用环境变量配置的管理员登录。API 文档：http://localhost:8000/docs。
 
@@ -45,7 +45,11 @@ MySQL 使用持久化卷。不要执行 `docker compose down -v`，它会删除�
 
 服务端 .env 配置 WECHAT_APP_ID 和 WECHAT_APP_SECRET，再重建 API 容器；AppSecret 只放服务端。未配置时登录返回明确提示，不使用模拟微信身份。miniprogram/services/api.ts 中 API_BASE 默认为 http://localhost:8000，仅供本机开发工具测试。上线时改为实际 HTTPS API 域名，并在微信平台配置 request 和 downloadFile 合法域名、隐私声明。真实手机无法通过 localhost 访问电脑。
 
-两张黑金原图由 API 的 /assets/mini/brand.png 和 /assets/mini/rewards.png 提供，避免放入小程序包。头像目前显示昵称首字，不读取微信头像。图1的固定卡片和图6的固定20行榜单作为设计参考，实际卡片与榜单由代码动态渲染。
+首次打开小程序进入会员注册页。用户阅读并同意说明后，通过微信 `chooseAvatar` 主动选择头像，通过 `input type="nickname"` 选择微信昵称或填写自定义昵称，再提交注册。不是静默读取微信资料。服务端校验微信身份后一并保存昵称、头像和同意时间，同一 OpenID 不会重复建档；已有会员可直接微信登录，历史会员缺少资料时补全。昵称和头像可在“我的”页修改，后台玩家列表和详情展示头像。
+
+头像使用 `wx.uploadFile` 上传，限制5MB，支持 JPG/PNG/WebP，服务端重新编码为256像素 JPEG。上线时除 request、downloadFile 外还要配置 uploadFile 合法域名，并在微信后台填写实际用户隐私保护指引。页面中的说明不替代平台隐私配置。头像保存在 backend/uploads/avatars；Docker 使用 avatar-data 持久化卷，备份时同时保存数据库与头像卷。新增资料字段通过 Alembic 迁移保留原有会员、积分和奖励。
+
+两张黑金原图由 API 的 /assets/mini/brand.png 和 /assets/mini/rewards.png 提供，避免放入小程序包。图1的固定卡片和图6的固定20行榜单作为设计参考，实际卡片与榜单由代码动态渲染。
 
 执行 npm run typecheck:mini 验证 TypeScript（需要先安装 frontend 依赖）。服务端测试覆盖微信身份重复登录、管理员/玩家权限隔离、奖励归属和核销后隐藏核销码；测试替换微信换码服务，不能替代真实微信登录验收。发布前还须在微信开发者工具与真机验证页面、安全区、素材加载及真实登录。
 

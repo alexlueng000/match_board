@@ -8,6 +8,79 @@ from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 from app import db, main
 import pytest
+from io import BytesIO
+from PIL import Image
+
+
+def avatar_file(color="gold"):
+    data = BytesIO()
+    Image.new("RGB", (32, 48), color).save(data, format="PNG")
+    return ("avatar.png", data.getvalue(), "image/png")
+
+
+def test_member_registration_profile_and_repeat_login(client, monkeypatch, tmp_path):
+    from app import mini, avatars
+
+    monkeypatch.setattr(mini, "exchange_code", lambda code: "profile-" + code)
+    monkeypatch.setattr(avatars, "AVATAR_DIR", tmp_path)
+    before = len(client.get("/users").json())
+    response = client.post("/mini/auth/register", data={"code": "alice", "nickname": " 小明 ", "agreed": "true"}, files={"avatar": avatar_file()})
+    assert response.status_code == 200
+    registered = response.json()
+    headers = {"Authorization": "Bearer " + registered["access_token"]}
+    member = client.get("/mini/me", headers=headers).json()
+    assert member["nickname"] == "小明"
+    assert member["profile_complete"] is True
+    assert member["avatar_url"].startswith("/assets/avatars/")
+    with Image.open(tmp_path / member["avatar_url"].rsplit("/", 1)[-1]) as image:
+        assert image.size == (256, 256) and image.format == "JPEG"
+    admin_member = next(u for u in client.get("/users").json() if u["member_code"] == member["member_code"])
+    assert admin_member["avatar_url"] == member["avatar_url"]
+    with main.Session() as session:
+        assert session.get(db.User, member["id"]).profile_consented_at is not None
+    login = client.post("/mini/auth", json={"code": "alice", "existing_only": True})
+    assert login.status_code == 200 and login.json()["member_code"] == registered["member_code"]
+    repeated = client.post("/mini/auth/register", data={"code": "alice", "nickname": "小明新昵称", "agreed": "true"}, files={"avatar": avatar_file("blue")})
+    assert repeated.status_code == 200 and repeated.json()["member_code"] == registered["member_code"]
+    assert len(client.get("/users").json()) == before + 1
+    assert client.get("/mini/me", headers=headers).json()["nickname"] == "小明新昵称"
+
+
+def test_registration_rejects_missing_consent_bad_avatar_and_wechat_failure(client, monkeypatch, tmp_path):
+    from app import mini, avatars
+
+    monkeypatch.setattr(avatars, "AVATAR_DIR", tmp_path)
+    monkeypatch.setattr(mini, "exchange_code", lambda code: "profile-" + code)
+    assert client.post("/mini/auth", json={"code": "unknown", "existing_only": True}).status_code == 404
+    base = {"code": "alice", "nickname": "小明", "agreed": "true"}
+    assert client.post("/mini/auth/register", data={**base, "agreed": "false"}, files={"avatar": avatar_file()}).status_code == 422
+    assert client.post("/mini/auth/register", data={**base, "nickname": "   "}, files={"avatar": avatar_file()}).status_code == 422
+    assert client.post("/mini/auth/register", data=base, files={"avatar": ("avatar.png", b"not an image", "image/png")}).status_code == 422
+    assert client.post("/mini/auth/register", data=base, files={"avatar": ("big.png", b"x" * (5 * 1024 * 1024 + 1), "image/png")}).status_code == 422
+    def unavailable(code):
+        from fastapi import HTTPException
+        raise HTTPException(503, "微信登录尚未配置，请联系门店")
+    monkeypatch.setattr(mini, "exchange_code", unavailable)
+    assert client.post("/mini/auth/register", data=base, files={"avatar": avatar_file()}).status_code == 503
+    assert client.get("/users").json() == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_avatar_update_requires_player_and_preserves_other_members(client, monkeypatch, tmp_path):
+    from app import mini, avatars
+
+    monkeypatch.setattr(avatars, "AVATAR_DIR", tmp_path)
+    monkeypatch.setattr(mini, "exchange_code", lambda code: "profile-" + code)
+    alice = client.post("/mini/auth", json={"code": "alice", "nickname": "小明"}).json()
+    bob = client.post("/mini/auth", json={"code": "bob", "nickname": "小红"}).json()
+    data = {"nickname": "新昵称"}
+    assert client.post("/mini/profile/avatar", data=data, files={"avatar": avatar_file()}).status_code == 401
+    response = client.post("/mini/profile/avatar", headers={"Authorization": "Bearer " + alice["access_token"]}, data=data, files={"avatar": avatar_file()})
+    assert response.status_code == 200
+    member = client.get("/mini/me", headers={"Authorization": "Bearer " + alice["access_token"]}).json()
+    assert member["nickname"] == "新昵称" and member["profile_complete"] is True
+    other = client.get("/mini/me", headers={"Authorization": "Bearer " + bob["access_token"]}).json()
+    assert other["nickname"] == "小红" and other["avatar_url"] is None
 
 
 @pytest.fixture()
@@ -34,6 +107,34 @@ def client():
         c.headers["Authorization"] = "Bearer " + response.json()["access_token"]
         yield c
     engine.dispose()
+
+
+def test_create_admin_with_short_password(client, monkeypatch):
+    from app import manage
+
+    monkeypatch.setattr(manage, "Session", main.Session)
+    monkeypatch.setattr("sys.argv", ["manage", "create-admin", "zq"])
+    monkeypatch.setattr(manage.getpass, "getpass", lambda prompt: "123456")
+    manage.main()
+    response = client.post(
+        "/auth/login", json={"username": "zq", "password": "123456"}
+    )
+    assert response.status_code == 200
+    with main.Session() as session:
+        account = session.scalar(select(db.Admin).where(db.Admin.username == "zq"))
+        assert account.password_hash != "123456"
+        assert main.passwords.verify("123456", account.password_hash)
+
+
+def test_bootstrap_admin_with_short_password(client, monkeypatch):
+    monkeypatch.setattr(main.settings, "admin_username", "short-password-admin")
+    monkeypatch.setattr(main.settings, "admin_password", "123456")
+    with TestClient(main.app) as c:
+        response = c.post(
+            "/auth/login",
+            json={"username": "short-password-admin", "password": "123456"},
+        )
+        assert response.status_code == 200
 
 
 def players(c):

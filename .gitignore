@@ -9,3 +9,4 @@ __pycache__/
 project.private.config.json
 .DS_Store
 *.tsbuildinfo
+backend/uploads/

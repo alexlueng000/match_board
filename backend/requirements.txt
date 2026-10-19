@@ -8,3 +8,5 @@ pwdlib[argon2]==0.2.1
 pydantic-settings==2.9.1
 pytest==8.3.5
 httpx==0.28.1
+python-multipart==0.0.20
+Pillow==11.2.1

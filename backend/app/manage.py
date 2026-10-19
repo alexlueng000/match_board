@@ -14,9 +14,9 @@ def main():
     args = parser.parse_args()
     if not 1 <= len(args.username) <= 80:
         parser.error("账号长度须为1至80个字符")
-    password = getpass.getpass("新密码（至少12位）: ")
-    if len(password) < 12 or len(password) > 256:
-        parser.error("密码长度须为12至256位")
+    password = getpass.getpass("新密码（1至256位）: ")
+    if not 1 <= len(password) <= 256:
+        parser.error("密码长度须为1至256位")
     if password != getpass.getpass("再次输入新密码: "):
         parser.error("两次密码不一致")
     with Session.begin() as db:

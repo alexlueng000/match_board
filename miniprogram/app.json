@@ -6,7 +6,8 @@
     "pages/me/me",
     "pages/login/login",
     "pages/reward-detail/reward-detail",
-    "pages/sessions/sessions"
+    "pages/sessions/sessions",
+    "pages/privacy/privacy"
   ],
   "window": {
     "navigationBarTextStyle": "white",

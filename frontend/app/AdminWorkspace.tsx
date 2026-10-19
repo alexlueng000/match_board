@@ -518,7 +518,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                     <tbody>
                       {data.map((p) => (
                         <tr key={p.id}>
-                          <td>{p.nickname}</td>
+                          <td><span className="member-profile">{p.avatar_url && <img className="member-avatar" src={apiBase + p.avatar_url} alt="" />}{p.nickname}</span></td>
                           <td>{p.member_code}</td>
                           <td>{p.monthly_score}</td>
                           <td>{p.total_score}</td>
@@ -916,7 +916,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
             <div className="modal-backdrop">
               <section className="modal">
                 <div className="card-heading">
-                  <h2>{detail.user.nickname} · 玩家详情</h2>
+                  <h2 className="member-profile">{detail.user.avatar_url && <img className="member-avatar" src={apiBase + detail.user.avatar_url} alt="" />}{detail.user.nickname} · 玩家详情</h2>
                   <button className="link" onClick={() => setDetail(null)}>
                     关闭
                   </button>

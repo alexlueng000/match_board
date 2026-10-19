@@ -18,8 +18,10 @@ dummy_password_hash = passwords.hash(secrets.token_urlsafe(32))
 
 @asynccontextmanager
 async def lifespan(app):
-    if len(settings.admin_password) < 12 or len(settings.jwt_secret) < 32:
-        raise RuntimeError("ADMIN_PASSWORD 至少12位，JWT_SECRET 至少32位")
+    if not 1 <= len(settings.admin_password) <= 256:
+        raise RuntimeError("ADMIN_PASSWORD 须为1至256位")
+    if len(settings.jwt_secret) < 32:
+        raise RuntimeError("JWT_SECRET 至少32位")
     with Session.begin() as db:
         if not db.scalar(
             select(Admin).where(Admin.username == settings.admin_username)
@@ -153,11 +155,12 @@ def rankings(db, month=None):
                 User.id,
                 User.member_code,
                 User.nickname,
+                User.avatar_url,
                 monthly.label("monthly_score"),
                 total.label("total_score"),
             )
             .outerjoin(PointLog, PointLog.user_id == User.id)
-            .group_by(User.id, User.member_code, User.nickname)
+            .group_by(User.id, User.member_code, User.nickname, User.avatar_url)
         )
         .mappings()
         .all()
@@ -622,3 +625,6 @@ app.mount(
     StaticFiles(directory=Path(__file__).resolve().parents[1] / "assets" / "mini"),
     name="mini-assets",
 )
+from .avatars import AVATAR_DIR
+
+app.mount("/assets/avatars", StaticFiles(directory=AVATAR_DIR), name="member-avatars")

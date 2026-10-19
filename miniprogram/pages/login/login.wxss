@@ -1,1 +1,4 @@
-/* Shared styles are defined in app.wxss. */
+.consent{display:flex;align-items:center;flex-wrap:wrap;gap:8rpx;font-size:24rpx;color:#d7bd88;margin-top:24rpx;line-height:1.8}.consent-check{font-size:34rpx}.privacy-link{text-decoration:underline;color:#efcf90}
+/* Override the native button's default width to preserve a circular avatar. */
+button.avatar-picker{width:132rpx!important;min-width:132rpx;max-width:132rpx;height:132rpx;min-height:132rpx;max-height:132rpx;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:50%;padding:0;line-height:normal;margin:0 auto;background:#211d14;border:2rpx solid #b18d50;overflow:hidden}
+.avatar-preview,.avatar-placeholder{display:block;width:100%;height:100%;border-radius:50%}.avatar-placeholder{display:flex;align-items:center;justify-content:center;font-size:60rpx;color:#d7b67a}.avatar-caption{text-align:center;font-size:24rpx;color:#b7a17a;margin:16rpx 0 28rpx}.error{margin-top:20rpx}

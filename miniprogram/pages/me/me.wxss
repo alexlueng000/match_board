@@ -1,1 +1,1 @@
-/* Shared styles are defined in app.wxss. */
+.avatar-button{padding:0;overflow:hidden}.avatar-image{width:100%;height:100%}

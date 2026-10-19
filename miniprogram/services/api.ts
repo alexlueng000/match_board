@@ -1,7 +1,7 @@
-export const API_BASE = 'http://localhost:8000';
+export const API_BASE = 'https://nuts.fateinsight.site/api';
 export const BRAND_BACKGROUND = API_BASE + '/assets/mini/brand.png';
 export const REWARDS_BACKGROUND = API_BASE + '/assets/mini/rewards.png';
-export interface Member {nickname:string;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string}
+export interface Member {nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string}
 export interface Rank {nickname:string;member_code:string;rank:number;score:number}
 export interface Board {current_month:string;rows:Rank[]}
 export interface Reward {id:number;reward_name:string;status:string;issued_at:string;redeemed_at:string|null;redeemedLabel?:string;competition_id:number|null;redeem_code:string|null;statusLabel?:string;dateLabel?:string}
@@ -15,9 +15,25 @@ export function request<T>(path:string,method:'GET'|'POST'='GET',data?:object):P
 }
 export function login(nickname:string):Promise<void>{return new Promise((resolve,reject)=>wx.login({success:r=>{
  if(!r.code){reject(new Error('微信登录失败，请重试'));return}
- request<{access_token:string}>('/auth','POST',{code:r.code,nickname}).then(result=>{wx.setStorageSync('player_token',result.access_token);resolve()},reject);
+ request<{access_token:string}>('/auth','POST',{code:r.code,nickname,existing_only:true}).then(result=>{wx.setStorageSync('player_token',result.access_token);resolve()},reject);
 },fail:()=>reject(new Error('微信登录失败，请重试'))}));}
 export function errorMessage(error:unknown):string{return error instanceof Error?error.message:'加载失败，请重试'}
+export function avatarSource(url:string|null|undefined):string{return url ? API_BASE+url : ''}
+function upload<T>(path:string,filePath:string,formData:{[key:string]:string}):Promise<T>{
+ return new Promise((resolve,reject)=>wx.uploadFile({url:API_BASE+'/mini'+path,filePath,name:'avatar',formData,header:{Authorization:'Bearer '+(wx.getStorageSync('player_token')||'')},success:r=>{
+  let body:{detail?:string};try{body=JSON.parse(r.data)}catch(_){reject(new Error('服务器响应异常，请稍后重试'));return}
+  if(r.statusCode>=200&&r.statusCode<300){resolve(body as T);return}
+  if(r.statusCode===401)wx.removeStorageSync('player_token');
+  reject(new Error(typeof body.detail==='string'?body.detail:'资料保存失败，请检查昵称和头像'));
+ },fail:()=>reject(new Error('头像上传失败，请检查网络后重试'))}));
+}
+export function registerMember(nickname:string,avatarPath:string):Promise<void>{
+ return new Promise((resolve,reject)=>wx.login({success:r=>{
+  if(!r.code){reject(new Error('微信登录失败，请重试'));return}
+  upload<{access_token:string}>('/auth/register',avatarPath,{code:r.code,nickname,agreed:'true'}).then(result=>{wx.setStorageSync('player_token',result.access_token);resolve()},reject);
+ },fail:()=>reject(new Error('微信登录失败，请重试'))}));
+}
+export function saveAvatar(nickname:string,avatarPath:string):Promise<{avatar_url:string}>{return upload('/profile/avatar',avatarPath,{nickname})}
 export function decorateReward(reward:Reward):Reward{const labels:{[key:string]:string}={pending:'待核销',redeemed:'已核销',cancelled:'已撤销',expired:'已失效'};return {...reward,statusLabel:labels[reward.status]||reward.status,dateLabel:reward.issued_at.slice(0,10),redeemedLabel:reward.redeemed_at?reward.redeemed_at.replace('T',' ').slice(0,16):''}}
 export function goLogin(){wx.navigateTo({url:'/pages/login/login'})}
 

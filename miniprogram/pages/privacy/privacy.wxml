@@ -1,0 +1,10 @@
+<view class="page"><view class="content"><view class="card">
+ <view class="title">会员资料与隐私说明</view>
+ <view class="note">27Nuts 使用你主动选择的头像、填写的昵称，以及微信登录提供的身份标识建立会员档案。不会读取微信号、通讯录或聊天记录。</view>
+ <view class="card-heading">资料用途</view>
+ <view class="note">头像用于个人档案展示；昵称和会员 ID 用于比赛名单、月榜与总榜。积分、报名和奖励由门店管理。微信身份标识仅用于登录和识别同一会员，不展示在排行榜。</view>
+ <view class="card-heading">保存与修改</view>
+ <view class="note">头像上传到门店服务端保存，并生成随机图片地址。昵称、头像和登录同意时间保存在会员档案中。你可以在“我的”页面修改头像和昵称；退出登录不会删除积分或奖励。</view>
+ <view class="card-heading">你的选择</view>
+ <view class="note">同意说明后，可主动选择头像和填写昵称。未同意或未完成资料时不会通过本注册表单建立完整会员档案。如需查询、删除个人资料或处理身份问题，请通过门店现有服务渠道联系店员。</view>
+</view></view></view>

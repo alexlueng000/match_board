@@ -18,6 +18,8 @@ services:
     restart: unless-stopped
   api:
     build: ./backend
+    volumes:
+      - avatar-data:/app/uploads
     environment:
       DATABASE_URL: mysql+pymysql://nuts:${MYSQL_PASSWORD}@mysql:3306/nuts
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
@@ -52,3 +54,4 @@ services:
     restart: unless-stopped
 volumes:
   mysql-data:
+  avatar-data:

@@ -1,1 +1,25 @@
-<view class="page"><image class="background" src="{{background}}" mode="aspectFill"/><view class="content"><view class="brand-head"/><view class="card"><view class="eyebrow">加入竞技 · 记录荣誉</view><view class="title">欢迎来到 27Nuts</view><view class="muted">查看赛事积分与排名，让每一份奖励都有迹可循。</view><view class="divider"/><view class="field-label">昵称（可选，后续可修改）</view><input type="nickname" maxlength="80" placeholder="输入你希望展示的昵称" value="{{nickname}}" bindinput="nicknameInput"/><view class="note" bindtap="toggleAgree">{{agreed?'☑':'☐'}} 我已知晓：登录将创建门店会员档案；昵称与会员 ID 会展示在赛事排行榜，积分和奖励由门店记录。</view><view class="error" wx:if="{{error}}">{{error}}</view><button class="full" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">微信登录</button><view class="note">已有门店档案的玩家，请先向店员确认账号记录，避免使用不同身份重复记分。</view></view></view></view>
+<view class="page">
+ <image class="background" src="{{background}}" mode="aspectFill"/>
+ <view class="content"><view class="brand-head"/><view class="card">
+  <view class="eyebrow">加入竞技 · 记录荣誉</view>
+  <view class="title">欢迎来到 27Nuts</view>
+  <view class="muted">首次使用请完善会员资料，记录你的赛事积分与奖励。</view>
+  <view class="note">头像与昵称由你主动选择，用于会员档案；昵称和会员 ID 会展示在排行榜。后台通过微信身份识别会员。</view>
+  <view class="divider"/>
+  <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy}}">
+   <image wx:if="{{avatarPath}}" class="avatar-preview" src="{{avatarPath}}" mode="aspectFill"/>
+   <view wx:else class="avatar-placeholder">＋</view>
+  </button>
+  <view class="avatar-caption">点此选择头像</view>
+  <view class="field-label">昵称</view>
+  <input type="nickname" maxlength="80" placeholder="点此使用微信昵称，也可自行填写" value="{{nickname}}" bindinput="nicknameInput" bindblur="nicknameInput" disabled="{{busy}}"/>
+  <view class="consent" bindtap="toggleAgree" role="checkbox" aria-checked="{{agreed}}">
+   <text class="consent-check">{{agreed?'☑':'☐'}}</text>
+   <text>我已阅读并同意</text><text class="privacy-link" catchtap="openPrivacy">《会员资料与隐私说明》</text>
+  </view>
+  <view class="error" wx:if="{{error}}">{{error}}</view>
+  <button class="full" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{busy?'正在保存资料…':'微信登录并完成注册'}}</button>
+  <button class="full button-ghost" disabled="{{busy}}" bindtap="existingLogin">已有会员，微信登录</button>
+  <view class="note">已有线下档案的玩家，请先联系店员核对身份。当前不会按昵称自动合并档案。</view>
+ </view></view>
+</view>

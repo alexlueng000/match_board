@@ -56,6 +56,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     member_code: Mapped[str] = mapped_column(String(32), unique=True)
     nickname: Mapped[str] = mapped_column(String(80))
+    avatar_url: Mapped[str | None] = mapped_column(String(255))
+    profile_consented_at: Mapped[datetime | None] = mapped_column(DateTime)
     openid: Mapped[str | None] = mapped_column(String(128), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
