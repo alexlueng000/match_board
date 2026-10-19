@@ -2,7 +2,7 @@ export const API_BASE = 'https://nuts.fateinsight.site/api';
 export const BRAND_BACKGROUND = API_BASE + '/assets/mini/brand.png';
 export const REWARDS_BACKGROUND = API_BASE + '/assets/mini/rewards.png';
 export interface Member {nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string}
-export interface Rank {nickname:string;member_code:string;rank:number;score:number}
+export interface Rank {nickname:string;member_code:string;rank:number;score:number;avatar_url?:string|null;avatarUrl?:string}
 export interface Board {current_month:string;rows:Rank[]}
 export interface Reward {id:number;reward_name:string;status:string;issued_at:string;redeemed_at:string|null;redeemedLabel?:string;competition_id:number|null;redeem_code:string|null;statusLabel?:string;dateLabel?:string}
 export function loggedIn():boolean{return Boolean(wx.getStorageSync('player_token'))}

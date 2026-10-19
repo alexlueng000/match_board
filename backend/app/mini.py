@@ -186,6 +186,7 @@ def ranking(scope: str = "monthly", db=Depends(session)):
         "rows": [
             {
                 "nickname": r["nickname"],
+                "avatar_url": r["avatar_url"],
                 "member_code": r["member_code"],
                 "rank": r[key],
                 "score": r["monthly_score" if scope == "monthly" else "total_score"],

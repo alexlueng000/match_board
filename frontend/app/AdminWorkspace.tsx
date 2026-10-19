@@ -1,5 +1,6 @@
 "use client";
 import MatchSessions from "./MatchSessions";
+import CreatePlayerModal from "./CreatePlayerModal";
 import PrizeSettings, {awardLabel} from "./PrizeSettings";
 import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
 import {
@@ -58,6 +59,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
     [rewardDetail, setRewardDetail] = useState<Row | null>(null),
     [eventType, setEventType] = useState("regular");
   const loadSequence = useRef(0);
+  const [creatingPlayer, setCreatingPlayer] = useState(false);
   useEffect(() => {
     setToken(sessionStorage.getItem("nuts_token") || "");
     if (!sessionId) {
@@ -494,8 +496,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                 </div>
                 <button
                   onClick={() => {
-                    const nickname = prompt("新玩家昵称");
-                    if (nickname) action("/users", { nickname }, "玩家已创建");
+                    setCreatingPlayer(true);
                   }}
                 >
                   <Plus size={16} />
@@ -857,6 +858,11 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
               </div>
             </section>
           )}
+          {creatingPlayer && <CreatePlayerModal onClose={() => setCreatingPlayer(false)} onCreate={async (nickname) => {
+            await api("/users", { nickname });
+            setNotice("玩家已创建");
+            await load();
+          }} />}
           {eventDetail && (
             <div className="modal-backdrop">
               <section className="modal">

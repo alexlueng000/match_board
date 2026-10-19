@@ -36,6 +36,10 @@ def test_member_registration_profile_and_repeat_login(client, monkeypatch, tmp_p
         assert image.size == (256, 256) and image.format == "JPEG"
     admin_member = next(u for u in client.get("/users").json() if u["member_code"] == member["member_code"])
     assert admin_member["avatar_url"] == member["avatar_url"]
+    for scope in ("monthly", "total"):
+        board = client.get("/mini/rankings?scope=" + scope).json()
+        ranked_member = next(row for row in board["rows"] if row["member_code"] == member["member_code"])
+        assert ranked_member["avatar_url"] == member["avatar_url"]
     with main.Session() as session:
         assert session.get(db.User, member["id"]).profile_consented_at is not None
     login = client.post("/mini/auth", json={"code": "alice", "existing_only": True})

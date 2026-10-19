@@ -11,6 +11,10 @@ const fetchMock=vi.fn(async(input: string,options?:RequestInit)=>{
   let result:any={};
   if(path==='/auth/login')result={access_token:'test-token',username:'admin'};
   else if(path==='/dashboard')result={current_month:'2026-10',users:3,competitions:recorded?1:0,month_points:recorded?18:0,pending_rewards:rewards.filter(r=>r.status==='pending').length};
+  else if(path==='/users'&&body){
+    const player={id:players.length+1,nickname:body.nickname,member_code:'A004',monthly_score:0,total_score:0,monthly_rank:4,total_rank:4};
+    players.push(player);result=player;
+  }
   else if(path==='/users')result=players;
   else if(path==='/prize-settings')result={prizes:[],rules:[]};
   else if(path==='/reward-types')result={GTO_TICKET:'GTO赛事门票',GIFT:'GTO冠军礼品'};
@@ -73,4 +77,29 @@ test('接口登录失败时显示错误并保留登录界面',async()=>{
   await user.click(screen.getByRole('button',{name:/登录管理后台/}));
   expect(await screen.findByText('账号或密码错误')).toBeTruthy();
   expect(sessionStorage.getItem('nuts_token')).toBeNull();
+});
+
+test('新增玩家使用页面弹窗，取消不提交并校验昵称',async()=>{
+  sessionStorage.setItem('nuts_token','test-token');
+  const promptSpy=vi.spyOn(window,'prompt');
+  const user=userEvent.setup();render(<Page/>);
+  await user.click(await screen.findByRole('button',{name:'玩家管理'}));
+  await user.click(await screen.findByRole('button',{name:'新增玩家'}));
+  let modal=await screen.findByRole('dialog',{name:'新增玩家'});
+  await user.click(within(modal).getByRole('button',{name:'取消'}));
+  expect(screen.queryByRole('dialog',{name:'新增玩家'})).toBeNull();
+  await user.click(screen.getByRole('button',{name:'新增玩家'}));
+  modal=await screen.findByRole('dialog',{name:'新增玩家'});
+  await user.click(within(modal).getByRole('button',{name:'确认创建'}));
+  expect((await within(modal).findByRole('alert')).textContent).toBe('请填写玩家昵称');
+  await user.type(within(modal).getByLabelText('玩家昵称'),' 新玩家 ');
+  fetchMock.mockResolvedValueOnce({ok:false,status:500,json:async()=>({detail:'创建失败，请重试'})} as Response);
+  await user.click(within(modal).getByRole('button',{name:'确认创建'}));
+  expect((await within(modal).findByRole('alert')).textContent).toBe('创建失败，请重试');
+  expect((within(modal).getByLabelText('玩家昵称') as HTMLInputElement).value).toBe(' 新玩家 ');
+  await user.click(within(modal).getByRole('button',{name:'确认创建'}));
+  await screen.findByText('玩家已创建');
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'新增玩家'})).toBeNull());
+  expect(players.at(-1)?.nickname).toBe('新玩家');
+  expect(promptSpy).not.toHaveBeenCalled();
 });

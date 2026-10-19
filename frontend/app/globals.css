@@ -623,5 +623,10 @@ footer {
 }
 
 .reward-modal { z-index: 6; }
+.player-modal { max-width: 460px; }
+.player-modal input { width: 100%; margin-top: 10px; }
+.player-modal .error { margin-top: 16px; }
+.player-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.player-modal-actions .secondary { background: white; color: var(--text); border: 1px solid var(--border); }
 .member-profile { display: inline-flex; align-items: center; gap: 10px; }
 .member-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
