@@ -220,6 +220,7 @@ def require_user(db, uid):
 @app.get("/users/{uid}")
 def detail(uid: int, db=Depends(session), a=Depends(admin)):
     require_user(db, uid)
+    from .exchanges import wallet, history
     logs = db.scalars(
         select(PointLog).where(PointLog.user_id == uid).order_by(PointLog.id)
     ).all()
@@ -239,7 +240,8 @@ def detail(uid: int, db=Depends(session), a=Depends(admin)):
         record["total_score_after"] = total_balance
         records.append(record)
     return {
-        "user": next(r for r in rankings(db, current_month(db)) if r["id"] == uid),
+        "user": {**next(r for r in rankings(db, current_month(db)) if r["id"] == uid), **wallet(db, uid)},
+        "exchanges": history(db, uid),
         "points": records[::-1],
         "rewards": db.scalars(
             select(Reward).where(Reward.user_id == uid).order_by(Reward.id.desc())
@@ -254,7 +256,8 @@ class Adjustment(Month):
 
 @app.post("/users/{uid}/points")
 def adjust(uid: int, body: Adjustment, db=Depends(session), a=Depends(admin)):
-    require_user(db, uid)
+    from .exchanges import lock_member
+    lock_member(db, uid)
     if not body.points or not body.reason.strip():
         raise HTTPException(422, "积分不能为0，原因不能为空")
     db.add(
@@ -370,9 +373,9 @@ def competition(body: CompetitionInput, db=Depends(session), a=Depends(admin)):
             if uid is not None
         ):
             raise HTTPException(422, "获奖玩家必须是本场已确认到场的参赛者")
-    for uid in [body.champion, body.second, body.third, body.pool27]:
-        if uid is not None:
-            require_user(db, uid)
+    from .exchanges import lock_member
+    for uid in sorted({uid for uid in [body.champion, body.second, body.third, body.pool27] if uid is not None}):
+        lock_member(db, uid)
     c = Competition(
         request_id=body.request_id,
         request_payload=body.model_dump_json(
@@ -470,12 +473,12 @@ def ranking(
 def reward_types(db=Depends(session), a=Depends(admin)):
     return {
         p.code: p.name
-        for p in db.scalars(select(Prize).where(Prize.enabled == True)).all()
+        for p in db.scalars(select(Prize).where(Prize.enabled == True, Prize.deleted == False)).all()
     }
 
 
 @app.get("/rewards")
-def rewards(status: str = "", code: str = "", db=Depends(session), a=Depends(admin)):
+def rewards(status: str = "", code: str = "", user_id: int | None = None, db=Depends(session), a=Depends(admin)):
     stmt = select(Reward, User.nickname, User.member_code).join(
         User, User.id == Reward.user_id
     )
@@ -483,6 +486,8 @@ def rewards(status: str = "", code: str = "", db=Depends(session), a=Depends(adm
         stmt = stmt.where(Reward.status == status)
     if code:
         stmt = stmt.where(Reward.redeem_code == code.upper())
+    if user_id is not None:
+        stmt = stmt.where(Reward.user_id == user_id)
     return [
         dict(
             **{c.name: getattr(r, c.name) for c in Reward.__table__.columns},
@@ -502,7 +507,8 @@ class IssueInput(BaseModel):
 
 @app.post("/rewards")
 def manual_reward(body: IssueInput, db=Depends(session), a=Depends(admin)):
-    require_user(db, body.user_id)
+    from .exchanges import lock_member
+    lock_member(db, body.user_id)
     if not body.reason.strip():
         raise HTTPException(422, "奖励类型或原因无效")
     for _ in range(body.quantity):
@@ -513,6 +519,26 @@ def manual_reward(body: IssueInput, db=Depends(session), a=Depends(admin)):
 
 class Reason(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
+
+
+class BatchRedeem(BaseModel):
+    user_id: int
+    reward_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+@app.post("/rewards/redeem-batch")
+def redeem_batch(body: BatchRedeem, db=Depends(session), a=Depends(admin)):
+    if len(set(body.reward_ids)) != len(body.reward_ids):
+        raise HTTPException(422, "请勿重复选择奖励")
+    from .exchanges import lock_member
+    lock_member(db, body.user_id)
+    changed = db.execute(update(Reward).where(Reward.id.in_(body.reward_ids), Reward.user_id == body.user_id, Reward.status == "pending")
+        .values(status="redeemed", redeemed_at=now(), redeemed_by=a.id)).rowcount
+    if changed != len(body.reward_ids):
+        db.rollback()
+        raise HTTPException(409, "奖励归属或状态已变化，本次未核销，请刷新后重新选择")
+    db.commit()
+    return {"ok": True, "count": changed}
 
 
 @app.post("/rewards/{rid}/redeem")
@@ -533,6 +559,11 @@ def redeem(rid: int, db=Depends(session), a=Depends(admin)):
 def cancel(rid: int, body: Reason, db=Depends(session), a=Depends(admin)):
     if not body.reason.strip():
         raise HTTPException(422, "请填写原因")
+    reward_owner = db.scalar(select(Reward.user_id).where(Reward.id == rid))
+    if reward_owner is None:
+        raise HTTPException(404, "奖励不存在")
+    from .exchanges import lock_member
+    lock_member(db, reward_owner)
     changed = db.execute(
         update(Reward)
         .where(Reward.id == rid, Reward.status == "pending")
@@ -550,6 +581,9 @@ def cancel(rid: int, body: Reason, db=Depends(session), a=Depends(admin)):
 
     reward = db.scalar(select(Reward).where(Reward.id == rid).with_for_update())
     release(db, reward, a.id)
+    order = db.scalar(select(ExchangeOrder).where(ExchangeOrder.reward_id == rid).with_for_update())
+    if order:
+        order.refunded_at = now()
     db.commit()
     return {"ok": True}
 
@@ -616,10 +650,12 @@ from pathlib import Path
 from .mini import router as mini_router
 from .matches import router as match_router
 from .prizes import router as prize_router
+from .exchanges import router as exchange_router
 
 app.include_router(mini_router)
 app.include_router(match_router)
 app.include_router(prize_router)
+app.include_router(exchange_router)
 app.mount(
     "/assets/mini",
     StaticFiles(directory=Path(__file__).resolve().parents[1] / "assets" / "mini"),

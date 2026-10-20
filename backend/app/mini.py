@@ -157,9 +157,10 @@ def update_avatar(
 
 @router.get("/me")
 def me(db=Depends(session), user=Depends(player)):
+    from .exchanges import wallet
     month = current_month(db)
     row = next(r for r in rankings(db, month) if r["id"] == user.id)
-    return {**row, "current_month": month, "profile_complete": bool(user.avatar_url and user.profile_consented_at)}
+    return {**row, **wallet(db, user.id), "current_month": month, "profile_complete": bool(user.avatar_url and user.profile_consented_at)}
 
 
 class Profile(BaseModel):
@@ -204,6 +205,7 @@ def reward_json(reward):
         "issued_at": reward.issued_at,
         "redeemed_at": reward.redeemed_at,
         "competition_id": reward.competition_id,
+        "source_label": "积分兑换" if reward.operated_by is None else ("赛事奖励" if reward.competition_id else "门店补发奖励"),
         "redeem_code": reward.redeem_code if reward.status == "pending" else None,
     }
 
@@ -225,4 +227,4 @@ def reward_detail(rid: int, db=Depends(session), user=Depends(player)):
     )
     if not reward:
         raise HTTPException(404, "奖励不存在")
-    return reward_json(reward)
+    return {**reward_json(reward), "member_code": user.member_code}

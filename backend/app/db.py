@@ -142,7 +142,7 @@ class Reward(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancelled_by: Mapped[int | None] = mapped_column(ForeignKey("admins.id"))
     cancellation_reason: Mapped[str | None] = mapped_column(String(500))
-    operated_by: Mapped[int] = mapped_column(ForeignKey("admins.id"))
+    operated_by: Mapped[int | None] = mapped_column(ForeignKey("admins.id"))
     remark: Mapped[str] = mapped_column(String(500), default="")
     stock_reserved: Mapped[bool] = mapped_column(default=False, server_default="0")
 
@@ -154,6 +154,8 @@ class Prize(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     stock: Mapped[int | None]
     version: Mapped[int] = mapped_column(default=0)
+    exchange_points: Mapped[int | None] = mapped_column(Integer)
+    deleted: Mapped[bool] = mapped_column(default=False, server_default="0")
 
 
 class PrizeRule(Base):
@@ -171,8 +173,21 @@ class InventoryLog(Base):
     balance: Mapped[int | None]
     reason: Mapped[str] = mapped_column(String(500))
     reward_id: Mapped[int | None] = mapped_column(ForeignKey("rewards.id"))
-    operator_id: Mapped[int] = mapped_column(ForeignKey("admins.id"))
+    operator_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class ExchangeOrder(Base):
+    __tablename__ = "exchange_orders"
+    __table_args__ = (UniqueConstraint("user_id", "request_id", name="uq_exchange_request"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(80))
+    prize_code: Mapped[str] = mapped_column(ForeignKey("prizes.code"))
+    reward_id: Mapped[int] = mapped_column(ForeignKey("rewards.id"), unique=True)
+    points: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Config(Base):

@@ -7,7 +7,8 @@
     "pages/login/login",
     "pages/reward-detail/reward-detail",
     "pages/sessions/sessions",
-    "pages/privacy/privacy"
+    "pages/privacy/privacy",
+    "pages/exchange/exchange"
   ],
   "window": {
     "navigationBarTextStyle": "white",

@@ -16,6 +16,12 @@ const fetchMock=vi.fn(async(input: string,options?:RequestInit)=>{
     players.push(player);result=player;
   }
   else if(path==='/users')result=players;
+  else if(path==='/rankings')result=[...players].sort((a,b)=>b[url.searchParams.get('scope')==='total'?'total_score':'monthly_score']-a[url.searchParams.get('scope')==='total'?'total_score':'monthly_score']);
+  else if(/^\/users\/\d+$/.test(path))result={user:players.find(p=>p.id===Number(path.split('/')[2])),points:[],rewards:[]};
+  else if(/^\/users\/\d+\/points$/.test(path)&&body){
+    players=players.map(p=>p.id===Number(path.split('/')[2])?{...p,monthly_score:p.monthly_score+body.points,total_score:p.total_score+body.points}:p);
+    result={ok:true};
+  }
   else if(path==='/prize-settings')result={prizes:[],rules:[]};
   else if(path==='/reward-types')result={GTO_TICKET:'GTO赛事门票',GIFT:'GTO冠军礼品'};
   else if(path==='/competitions'&&body){
@@ -24,6 +30,12 @@ const fetchMock=vi.fn(async(input: string,options?:RequestInit)=>{
     rewards=[1,2].map(id=>({id,user_id:1,nickname:'玩家甲',member_code:'A001',reward_name:'GTO赛事门票',status:'pending',redeem_code:'CODE00000'+id,issued_at:'2026-10-04T12:00:00'}));
     result={id:1,duplicate:false};
   }else if(path==='/competitions')result=[];
+  else if(path==='/rewards'&&body){
+    const player=players.find(p=>p.id===body.user_id)!;
+    const firstId=rewards.length+1;
+    rewards.push(...Array.from({length:body.quantity},(_,i)=>({id:firstId+i,user_id:body.user_id,nickname:player.nickname,member_code:player.member_code,reward_name:'GTO赛事门票',status:'pending',issued_at:'2026-10-20T12:00:00'})));
+    result={ok:true};
+  }
   else if(path==='/rewards')result=rewards;
   else if(path.match(/^\/rewards\/\d+\/redeem$/)){
     const id=Number(path.split('/')[2]);
@@ -67,6 +79,68 @@ test('管理员登录后录入GTO赛事，核销一张门票时另一张保持�
   await waitFor(()=>expect(screen.getAllByRole('button',{name:'核销'})).toHaveLength(1));
   expect(rewards.map(r=>r.status)).toEqual(['redeemed','pending']);
   expect(within(screen.getByRole('table')).getByText('已核销')).toBeTruthy();
+});
+
+test.each(['月赛榜','总榜'])('从%s直接打开积分调整并刷新榜单',async(scopeLabel)=>{
+  sessionStorage.setItem('nuts_token','test-token');
+  const user=userEvent.setup();render(<Page/>);
+  await user.click(await screen.findByRole('button',{name:'积分排行榜'}));
+  await user.click(await screen.findByRole('button',{name:scopeLabel}));
+  const buttons=await screen.findAllByRole('button',{name:'调整积分'});
+  await user.click(buttons[0]);
+  const modal=await screen.findByRole('dialog',{name:'玩家详情与积分调整'});
+  await user.type(within(modal).getByLabelText('积分变动'),'-3');
+  await user.type(within(modal).getByLabelText('原因'),'积分修正');
+  await user.click(within(modal).getByRole('button',{name:'确认调整'}));
+  await screen.findByText('积分已调整');
+  expect(players[0].monthly_score).toBe(-3);
+  expect(players[0].total_score).toBe(-3);
+  expect(fetchMock.mock.calls.some(([url,init])=>url.endsWith('/users/1/points')&&init?.body===JSON.stringify({points:-3,month:'2026-10',reason:'积分修正'}))).toBe(true);
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'玩家详情与积分调整'})).toBeNull());
+  expect(fetchMock.mock.calls.filter(([url,init])=>url.endsWith('/users/1/points')&&init?.method==='POST')).toHaveLength(1);
+  await waitFor(()=>expect(within(screen.getByRole('table')).getByText('-3')).toBeTruthy());
+});
+
+test('积分调整提交中防止双击，失败保留弹窗，重试成功后关闭',async()=>{
+  sessionStorage.setItem('nuts_token','test-token');
+  const user=userEvent.setup();render(<Page/>);
+  await user.click(await screen.findByRole('button',{name:'玩家管理'}));
+  await user.click((await screen.findAllByRole('button',{name:'查看详情'}))[0]);
+  const modal=await screen.findByRole('dialog',{name:'玩家详情与积分调整'});
+  await user.type(within(modal).getByLabelText('积分变动'),'5');
+  await user.type(within(modal).getByLabelText('原因'),'补录积分');
+  let finish!:(response:Response)=>void;
+  fetchMock.mockImplementationOnce(()=>new Promise<Response>(resolve=>{finish=resolve}));
+  await user.dblClick(within(modal).getByRole('button',{name:'确认调整'}));
+  expect(fetchMock.mock.calls.filter(([url,init])=>url.endsWith('/users/1/points')&&init?.method==='POST')).toHaveLength(1);
+  expect((within(modal).getByRole('button',{name:'确认调整'}) as HTMLButtonElement).disabled).toBe(true);
+  finish({ok:false,status:500,json:async()=>({detail:'提交失败，请重试'})} as Response);
+  expect((await within(modal).findByRole('alert')).textContent).toBe('提交失败，请重试');
+  expect((within(modal).getByLabelText('积分变动') as HTMLInputElement).value).toBe('5');
+  await user.click(within(modal).getByRole('button',{name:'确认调整'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'玩家详情与积分调整'})).toBeNull());
+  expect(players[0].total_score).toBe(5);
+});
+
+test('玩家详情给当前玩家发放多份奖励，成功后关闭弹窗且不调整积分',async()=>{
+  sessionStorage.setItem('nuts_token','test-token');
+  const user=userEvent.setup();render(<Page/>);
+  await user.click(await screen.findByRole('button',{name:'玩家管理'}));
+  await user.click((await screen.findAllByRole('button',{name:'查看详情'}))[0]);
+  const modal=await screen.findByRole('dialog',{name:'玩家详情与积分调整'});
+  await user.selectOptions(within(modal).getByLabelText('发放奖品'),'GTO_TICKET');
+  await user.clear(within(modal).getByLabelText('发放份数'));
+  await user.type(within(modal).getByLabelText('发放份数'),'2');
+  await user.type(within(modal).getByLabelText('发放原因'),' 活动补发 ');
+  await user.click(within(modal).getByRole('button',{name:'确认发放奖励'}));
+  await screen.findByText('奖励已发放');
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'玩家详情与积分调整'})).toBeNull());
+  const posts=fetchMock.mock.calls.filter(([url,init])=>url.endsWith('/rewards')&&init?.method==='POST');
+  expect(posts).toHaveLength(1);
+  expect(JSON.parse(String(posts[0][1]?.body))).toEqual({user_id:1,reward_type:'GTO_TICKET',quantity:2,reason:'活动补发'});
+  expect(rewards).toHaveLength(2);
+  expect(rewards.every(r=>r.user_id===1)).toBe(true);
+  expect(players[0].total_score).toBe(0);
 });
 
 test('接口登录失败时显示错误并保留登录界面',async()=>{

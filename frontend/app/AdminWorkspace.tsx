@@ -1,6 +1,8 @@
 "use client";
 import MatchSessions from "./MatchSessions";
 import CreatePlayerModal from "./CreatePlayerModal";
+import RedemptionDesk from "./RedemptionDesk";
+import ManualRewardForm from "./ManualRewardForm";
 import PrizeSettings, {awardLabel} from "./PrizeSettings";
 import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
 import {
@@ -59,7 +61,9 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
     [rewardDetail, setRewardDetail] = useState<Row | null>(null),
     [eventType, setEventType] = useState("regular");
   const loadSequence = useRef(0);
+  const adjustmentSubmitting = useRef(false);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
+  const [adjustmentError, setAdjustmentError] = useState("");
   useEffect(() => {
     setToken(sessionStorage.getItem("nuts_token") || "");
     if (!sessionId) {
@@ -106,11 +110,8 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
             ? "/competitions"
             : tab === "rankings"
               ? "/rankings?scope=" + scope
-              : tab === "rewards" || tab === "redeem"
-                ? "/rewards?status=" +
-                  status +
-                  "&code=" +
-                  encodeURIComponent(tab === "redeem" ? query : "")
+              : tab === "rewards"
+                ? "/rewards?status=" + status
                 : null;
       const [s, u, t, rows, prizes] = await Promise.all([
         api("/dashboard"),
@@ -710,6 +711,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                         <th>玩家</th>
                         <th>会员 ID</th>
                         <th>积分</th>
+                        <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -738,6 +740,10 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                               ]
                             }
                           </td>
+                          <td><button className="link" onClick={async () => {
+                            try { setAdjustmentError(""); setDetail(await api("/users/" + p.id)); }
+                            catch (e) { setError((e as Error).message); }
+                          }}>调整积分</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -802,28 +808,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
               </section>
             </>
           )}
-          {tab === "redeem" && (
-            <>
-              <section className="card redeem-card">
-                <div className="scan-icon">
-                  <ScanLine size={32} />
-                </div>
-                <h2>到店奖励核销</h2>
-                <p>输入玩家出示的核销码，核对玩家及奖励后确认使用。</p>
-                <div className="search">
-                  <Search size={19} />
-                  <input
-                    aria-label="核销码"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value.toUpperCase())}
-                    placeholder="输入 10 位核销码"
-                    maxLength={10}
-                  />
-                </div>
-              </section>
-              {query && <section className="card">{rewardTable(data)}</section>}
-            </>
-          )}
+          {tab === "redeem" && <RedemptionDesk api={api} onSaved={load}/>}
           {tab === "settings" && (
             <section className="card">
               <div className="card-heading">
@@ -917,10 +902,10 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
               </section>
             </div>
           )}
-          {rewardDetail && <div className="modal-backdrop reward-modal"><section className="modal" role="dialog" aria-modal="true" aria-label="奖励详情"><div className="card-heading"><h2>奖励详情 · #{rewardDetail.id}</h2><button className="link" onClick={()=>setRewardDetail(null)}>关闭</button></div><div className="summary-row"><span>玩家</span><strong>{rewardDetail.nickname||detail?.user.nickname} · {rewardDetail.member_code||detail?.user.member_code}</strong></div><div className="summary-row"><span>奖励</span><strong>{rewardDetail.reward_name}</strong></div><div className="summary-row"><span>状态</span><strong>{statuses[rewardDetail.status]}</strong></div><div className="summary-row"><span>来源赛事</span><strong>{rewardDetail.competition_id?`#${rewardDetail.competition_id}`:'手动补发'}</strong></div><div className="summary-row"><span>获得时间</span><strong>{fmt(rewardDetail.issued_at)}</strong></div><div className="summary-row"><span>核销时间 / 管理员</span><strong>{fmt(rewardDetail.redeemed_at)} / {rewardDetail.redeemed_by?`#${rewardDetail.redeemed_by}`:'—'}</strong></div><div className="summary-row"><span>发放原因</span><strong>{rewardDetail.remark||'赛事自动发放'}</strong></div>{rewardDetail.status==='cancelled'&&<div className="note">撤销原因：{rewardDetail.cancellation_reason} · 管理员 #{rewardDetail.cancelled_by} · {fmt(rewardDetail.cancelled_at)}</div>}</section></div>}
+          {rewardDetail && <div className="modal-backdrop reward-modal"><section className="modal" role="dialog" aria-modal="true" aria-label="奖励详情"><div className="card-heading"><h2>奖励详情 · #{rewardDetail.id}</h2><button className="link" onClick={()=>setRewardDetail(null)}>关闭</button></div><div className="summary-row"><span>玩家</span><strong>{rewardDetail.nickname||detail?.user.nickname} · {rewardDetail.member_code||detail?.user.member_code}</strong></div><div className="summary-row"><span>奖励</span><strong>{rewardDetail.reward_name}</strong></div><div className="summary-row"><span>状态</span><strong>{statuses[rewardDetail.status]}</strong></div><div className="summary-row"><span>来源赛事</span><strong>{rewardDetail.operated_by===null?'积分兑换':rewardDetail.competition_id?`#${rewardDetail.competition_id}`:'手动补发'}</strong></div><div className="summary-row"><span>获得时间</span><strong>{fmt(rewardDetail.issued_at)}</strong></div><div className="summary-row"><span>核销时间 / 管理员</span><strong>{fmt(rewardDetail.redeemed_at)} / {rewardDetail.redeemed_by?`#${rewardDetail.redeemed_by}`:'—'}</strong></div><div className="summary-row"><span>发放原因</span><strong>{rewardDetail.remark||'赛事自动发放'}</strong></div>{rewardDetail.status==='cancelled'&&<div className="note">撤销原因：{rewardDetail.cancellation_reason} · 管理员 #{rewardDetail.cancelled_by} · {fmt(rewardDetail.cancelled_at)}</div>}</section></div>}
           {detail && (
             <div className="modal-backdrop">
-              <section className="modal">
+              <section className="modal" role="dialog" aria-modal="true" aria-label="玩家详情与积分调整">
                 <div className="card-heading">
                   <h2 className="member-profile">{detail.user.avatar_url && <img className="member-avatar" src={apiBase + detail.user.avatar_url} alt="" />}{detail.user.nickname} · 玩家详情</h2>
                   <button className="link" onClick={() => setDetail(null)}>
@@ -931,17 +916,37 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                   {detail.user.member_code} · 本月 {detail.user.monthly_score}{" "}
                   分 · 累计 {detail.user.total_score} 分
                 </p>
+                <ManualRewardForm key={detail.user.id} types={types} disabled={busy} onIssue={async (body) => {
+                  setBusy(true);
+                  try {
+                    await api("/rewards", { ...body, user_id: detail.user.id });
+                    setDetail(null);
+                    setNotice("奖励已发放");
+                    await load();
+                  } finally { setBusy(false); }
+                }}/>
                 <h3>积分调整</h3>
+                <p className="muted">可用积分：{detail.user.available_points ?? detail.user.total_score} · 兑换已消费：{detail.user.spent_points ?? 0} 分（兑换不影响排行榜）</p>
+                <p className="muted">正数加分，负数扣分；调整会同时计入归属月份和累计总积分，并保留操作流水。</p>
                 <form
                   className="form-grid"
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const f = Object.fromEntries(new FormData(e.currentTarget));
-                    await action(
-                      "/users/" + detail.user.id + "/points",
-                      { ...f, points: Number(f.points) },
-                      "积分已调整",
-                    );
+                    const points = Number(f.points), reason = String(f.reason).trim();
+                    if (adjustmentSubmitting.current || busy) return;
+                    if (!Number.isInteger(points) || !points || Math.abs(points) > 10000 || !reason) {
+                      setAdjustmentError("请填写非零整数积分和调整原因"); return;
+                    }
+                    adjustmentSubmitting.current = true;
+                    setBusy(true); setAdjustmentError("");
+                    try {
+                      await api("/users/" + detail.user.id + "/points", { ...f, points, reason });
+                      setDetail(null);
+                      setNotice("积分已调整");
+                      await load();
+                    } catch (e) { setAdjustmentError((e as Error).message); }
+                    finally { adjustmentSubmitting.current = false; setBusy(false); }
                   }}
                 >
                   <label>
@@ -970,6 +975,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                   <div className="form-footer">
                     <button disabled={busy}>确认调整</button>
                   </div>
+                  {adjustmentError && <div className="error wide" role="alert">{adjustmentError}</div>}
                 </form>
                 <h3>积分流水</h3>
                 <div className="table-wrap">
@@ -1007,6 +1013,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                   </table>
                 </div>
                 <h3>奖励记录</h3>
+                {!!detail.exchanges?.length && <><h3>积分兑换记录</h3><div className="table-wrap"><table><thead><tr><th>门票</th><th>消耗积分</th><th>时间</th><th>退款</th></tr></thead><tbody>{detail.exchanges.map((order: Row) => <tr key={order.id}><td>{order.reward_name}</td><td>{order.points}</td><td>{fmt(order.created_at)}</td><td>{order.refunded_at ? "已退回可用积分" : "—"}</td></tr>)}</tbody></table></div></>}
                 {rewardTable(detail.rewards)}
               </section>
             </div>

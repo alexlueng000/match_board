@@ -627,6 +627,14 @@ footer {
 .player-modal input { width: 100%; margin-top: 10px; }
 .player-modal .error { margin-top: 16px; }
 .player-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
-.player-modal-actions .secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+.player-modal-actions .secondary { background: white; color: var(--ink); border: 1px solid var(--border); }
 .member-profile { display: inline-flex; align-items: center; gap: 10px; }
 .member-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.redemption-content { padding: 24px; }
+.redemption-content > input { display: block; width: 100%; max-width: 520px; margin: 10px 0 20px; }
+.redemption-players { display: grid; gap: 10px; }
+.redemption-player { justify-content: flex-start; flex-wrap: wrap; background: var(--paper); color: var(--ink); border: 1px solid var(--border); }
+.redemption-player span, .redemption-reward span { color: var(--muted); font-size: 12px; }
+.redemption-selected { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 20px 0; }
+.redemption-reward { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 0; border-top: 1px solid var(--border); }
+.redemption-reward input { width: 18px; height: 18px; }

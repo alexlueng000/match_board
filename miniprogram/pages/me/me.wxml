@@ -9,7 +9,7 @@
   </view>
   <view class="note">点击头像可以更换，填写昵称后保存资料。</view>
   <view class="stats"><view class="stat"><view class="stat-value">{{user.monthly_score}}</view><view class="stat-label">本月积分</view></view><view class="stat"><view class="stat-value">{{user.total_score}}</view><view class="stat-label">累计积分</view></view></view>
-  <view class="divider"/><view class="field-label">修改昵称</view>
+  <view class="note">可用积分 · {{user.available_points}} 分（兑换不影响榜单）</view><button class="full button-ghost" bindtap="goExchange">积分兑换门票</button><view class="divider"/><view class="field-label">修改昵称</view>
   <input type="nickname" value="{{nickname}}" maxlength="80" bindinput="nicknameInput" bindblur="nicknameInput" disabled="{{busy}}"/>
   <button class="full" loading="{{busy}}" disabled="{{busy}}" bindtap="save">保存资料</button>
   <button class="full button-ghost" bindtap="logout">退出登录</button>
