@@ -1128,3 +1128,45 @@ def test_concurrent_stock_reservation_and_cancellation(client):
         )["stock"]
         == 1
     )
+
+
+def test_ticket_qr_staff_redemption_and_permissions(client, monkeypatch):
+    from app import mini
+    import qrcode
+
+    monkeypatch.setattr(mini, "exchange_code", lambda code: "scan-" + code)
+    member = client.post("/mini/auth", json={"code": "alice"}).json()
+    other = client.post("/mini/auth", json={"code": "bob"}).json()
+    alice = {"Authorization": "Bearer " + member["access_token"]}
+    bob = {"Authorization": "Bearer " + other["access_token"]}
+    uid = client.get("/mini/me", headers=alice).json()["id"]
+    assert client.post("/rewards", json={"user_id": uid, "reward_type": "GTO_TICKET", "quantity": 2, "reason": "扫码测试"}).status_code == 200
+    rewards = client.get("/mini/rewards", headers=alice).json()
+    first, second = rewards
+    path = f"/mini/rewards/{first['id']}"
+    detail = client.get(path, headers=alice).json()
+    qr = qrcode.QRCode(box_size=1, border=4)
+    qr.add_data("NUTS:TICKET:" + detail["redeem_code"])
+    qr.make(fit=True)
+    assert detail["qr_matrix"] == qr.get_matrix()
+    assert client.get(path, headers=bob).status_code == 404
+    assert client.get(path).status_code == 401
+    code_path = "/rewards?code=" + first["redeem_code"]
+    redeem_path = f"/rewards/{first['id']}/redeem"
+    assert client.get(code_path, headers=alice).status_code == 401
+    assert client.post(redeem_path, json={}, headers=alice).status_code == 401
+    scanned = client.get(code_path).json()
+    assert len(scanned) == 1 and scanned[0]["user_id"] == uid
+    assert scanned[0]["status"] == "pending"
+    assert client.post(redeem_path, json={}).status_code == 200
+    assert client.post(redeem_path, json={}).status_code == 409
+    used = client.get(path, headers=alice).json()
+    assert used["redeem_code"] is None and "qr_matrix" not in used
+    assert client.get(f"/mini/rewards/{second['id']}", headers=alice).json()["status"] == "pending"
+    assert client.post(f"/rewards/{second['id']}/cancel", json={"reason": "撤销测试"}).status_code == 200
+    cancelled = client.get(f"/mini/rewards/{second['id']}", headers=alice).json()
+    assert cancelled["redeem_code"] is None and "qr_matrix" not in cancelled
+    assert client.post(f"/rewards/{second['id']}/redeem", json={}).status_code == 409
+    with main.Session() as session:
+        saved = session.get(db.Reward, first["id"])
+        assert saved.redeemed_by is not None and saved.redeemed_at is not None

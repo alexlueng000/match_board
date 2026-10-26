@@ -8,7 +8,8 @@
     "pages/reward-detail/reward-detail",
     "pages/sessions/sessions",
     "pages/privacy/privacy",
-    "pages/exchange/exchange"
+    "pages/exchange/exchange",
+    "pages/staff/staff"
   ],
   "window": {
     "navigationBarTextStyle": "white",

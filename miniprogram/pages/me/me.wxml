@@ -15,5 +15,6 @@
   <button class="full button-ghost" bindtap="logout">退出登录</button>
  </view>
  <view class="card" wx:else><view class="empty">登录后查看你的会员档案</view><button class="full" bindtap="login">微信登录</button></view>
- <view class="card"><view class="card-heading">参赛与奖励说明</view><view class="note">常规赛冠军 / 亚军 / 季军：5 / 3 / 1 分。</view><view class="note">GTO 冠军 / 亚军 / 季军：10 / 6 / 2 分。</view><view class="note">27收池不加分，对应奖励由门店发放。</view><view class="note">月积分按比赛月份归属，总积分累计保留。</view><view class="note">奖励到店出示核销码，由店员确认使用。</view><view class="note">如积分或奖励有疑问，请提供会员 ID 联系店员。</view></view>
+ <view class="card"><button class="full button-ghost" bindtap="goStaff">店员扫码核销</button></view>
+ <view class="card"><view class="card-heading">参赛与奖励说明</view><view class="note">常规赛冠军 / 亚军 / 季军：5 / 3 / 1 分。</view><view class="note">GTO 冠军 / 亚军 / 季军：10 / 6 / 2 分。</view><view class="note">27收池不加分，对应奖励由门店发放。</view><view class="note">月积分按比赛月份归属，总积分累计保留。</view><view class="note">奖励到店出示详情中的二维码，由店员扫码确认使用。</view><view class="note">如积分或奖励有疑问，请提供会员 ID 联系店员。</view></view>
 </view></view>

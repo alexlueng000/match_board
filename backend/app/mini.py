@@ -227,4 +227,11 @@ def reward_detail(rid: int, db=Depends(session), user=Depends(player)):
     )
     if not reward:
         raise HTTPException(404, "奖励不存在")
-    return {**reward_json(reward), "member_code": user.member_code}
+    result = {**reward_json(reward), "member_code": user.member_code}
+    if reward.status == "pending":
+        import qrcode
+        qr = qrcode.QRCode(box_size=1, border=4)
+        qr.add_data("NUTS:TICKET:" + reward.redeem_code)
+        qr.make(fit=True)
+        result["qr_matrix"] = qr.get_matrix()
+    return result

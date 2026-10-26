@@ -1,1 +1,3 @@
 /* Shared styles are defined in app.wxss. */
+
+.ticket-qr{margin:24rpx auto;max-width:100%}

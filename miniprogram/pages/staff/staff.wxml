@@ -1,0 +1,23 @@
+<view class="page staff-page"><view class="card">
+ <view class="card-heading">店员扫码核销</view>
+ <block wx:if="{{!authenticated}}">
+  <view class="note">使用管理后台账号登录，仅限授权店员操作。</view>
+  <input placeholder="店员账号" value="{{username}}" maxlength="80" bindinput="usernameInput" disabled="{{busy}}"/>
+  <input placeholder="密码" password value="{{password}}" maxlength="256" bindinput="passwordInput" disabled="{{busy}}"/>
+  <button class="full" bindtap="login" loading="{{busy}}" disabled="{{busy}}">店员登录</button>
+ </block>
+ <block wx:else>
+  <view class="note">扫描用户门票详情中的二维码，核对会员和门票后确认使用。</view>
+  <button class="full" bindtap="scan" disabled="{{busy}}" loading="{{busy}}">扫码门票</button>
+  <view wx:if="{{reward}}">
+   <view class="divider"/><view class="reward-name">{{reward.reward_name}}</view>
+   <view class="staff-info">玩家 · {{reward.nickname}}</view><view class="staff-info">会员 ID · {{reward.member_code}}</view>
+   <view class="muted">门票 #{{reward.id}} · {{reward.dateLabel}}</view><view class="badge {{reward.status}}">{{reward.statusLabel}}</view>
+   <button wx:if="{{reward.status==='pending'}}" class="full" bindtap="redeem" disabled="{{busy}}">确认核销此门票</button>
+   <view wx:else class="note">此门票已使用或已失效，不能核销。</view>
+  </view>
+  <view wx:if="{{notice}}" class="success">{{notice}}</view>
+  <button class="full button-ghost" bindtap="logout" disabled="{{busy}}">退出店员账号</button>
+ </block>
+ <view wx:if="{{error}}" class="error">{{error}}</view>
+</view></view>
