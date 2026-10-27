@@ -59,6 +59,9 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(255))
     profile_consented_at: Mapped[datetime | None] = mapped_column(DateTime)
     openid: Mapped[str | None] = mapped_column(String(128), unique=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id"), unique=True)
+    admin_granted_by: Mapped[int | None] = mapped_column(ForeignKey("admins.id"))
+    admin_changed_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 

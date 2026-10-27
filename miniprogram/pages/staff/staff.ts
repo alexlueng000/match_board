@@ -1,8 +1,22 @@
-import {staffRequest,staffLoggedIn,Reward,decorateReward,errorMessage} from '../../services/api';
+import {staffRequest,staffLoggedIn,Reward,decorateReward,errorMessage,RequestError} from '../../services/api';
 interface StaffReward extends Reward {nickname:string;member_code:string}
 Page({
  data:{authenticated:false,username:'',password:'',busy:false,error:'',notice:'',reward:null as StaffReward|null},
- onShow(){this.setData({authenticated:staffLoggedIn()})},
+ onShow(){if(!this.data.busy)this.checkAccess()},
+ async checkAccess(){
+  this.setData({busy:true,error:'',reward:null});
+  try{
+   for(let attempt=0;attempt<2;attempt++){
+    const hadStaffToken=staffLoggedIn();
+    try{
+     await staffRequest('/mini/staff/me');this.setData({authenticated:true});return;
+    }catch(error){
+     if(attempt===0&&hadStaffToken&&!staffLoggedIn())continue;
+     this.setData({authenticated:false,error:error instanceof RequestError&&(error.statusCode===401||error.statusCode===403)?'':errorMessage(error)});return;
+    }
+   }
+  }finally{this.setData({busy:false})}
+ },
  usernameInput(e:WechatMiniprogram.Input){this.setData({username:e.detail.value})},
  passwordInput(e:WechatMiniprogram.Input){this.setData({password:e.detail.value})},
  async login(){
@@ -30,7 +44,7 @@ Page({
    const rows=await staffRequest<StaffReward[]>('/rewards?code='+encodeURIComponent(match[1]));
    if(!rows.length)throw new Error('门票不存在，请核对二维码');
    this.setData({reward:{...rows[0],...decorateReward(rows[0])}});
-  }catch(error){this.setData({error:errorMessage(error),authenticated:staffLoggedIn()})}
+  }catch(error){this.setData({error:errorMessage(error),authenticated:error instanceof RequestError&&(error.statusCode===401||error.statusCode===403)?false:this.data.authenticated})}
   finally{this.setData({busy:false})}
  },
  async redeem(){
@@ -42,7 +56,7 @@ Page({
    this.setData({reward:null,notice:'核销成功：'+reward.nickname+' · '+reward.reward_name});
   }catch(error){
    // A failed response may follow a committed request. Require a fresh scan.
-   this.setData({reward:null,error:errorMessage(error)+'；请重新扫码确认门票最新状态',authenticated:staffLoggedIn()});
+   this.setData({reward:null,error:errorMessage(error)+'；请重新扫码确认门票最新状态',authenticated:error instanceof RequestError&&(error.statusCode===401||error.statusCode===403)?false:this.data.authenticated});
   }finally{this.setData({busy:false})}
  },
  logout(){if(this.data.busy)return;wx.removeStorageSync('staff_token');this.setData({authenticated:false,password:'',reward:null,error:'',notice:''})}

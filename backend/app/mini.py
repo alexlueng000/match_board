@@ -160,7 +160,7 @@ def me(db=Depends(session), user=Depends(player)):
     from .exchanges import wallet
     month = current_month(db)
     row = next(r for r in rankings(db, month) if r["id"] == user.id)
-    return {**row, **wallet(db, user.id), "current_month": month, "profile_complete": bool(user.avatar_url and user.profile_consented_at)}
+    return {**row, **wallet(db, user.id), "current_month": month, "is_admin": bool(user.admin_id), "profile_complete": bool(user.avatar_url and user.profile_consented_at)}
 
 
 class Profile(BaseModel):

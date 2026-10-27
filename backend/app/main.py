@@ -65,18 +65,22 @@ def admin(auth: HTTPAuthorizationCredentials = Depends(security), db=Depends(ses
             auth.credentials,
             settings.jwt_secret,
             algorithms=["HS256"],
-            options={"require": ["exp", "sub", "ver"]},
+            options={"require": ["exp", "sub"]},
         )
-        account = db.get(Admin, int(data["sub"]))
-        if (
-            not account
-            or data.get("kind", "admin") != "admin"
-            or data.get("ver") != account.token_version
-        ):
+        if data.get("kind") == "player":
+            member = db.get(User, int(data["sub"]))
+            if not member or not member.openid or not member.admin_id:
+                raise ValueError()
+            account = db.get(Admin, member.admin_id)
+        else:
+            account = db.get(Admin, int(data["sub"]))
+            if data.get("kind", "admin") != "admin" or not account or data.get("ver") != account.token_version:
+                raise ValueError()
+        if not account:
             raise ValueError()
         return account
-    except (jwt.PyJWTError, ValueError, KeyError):
-        raise HTTPException(401, "登录已过期，请重新登录")
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError):
+        raise HTTPException(401, "无管理员权限或登录已过期，请重新登录")
 
 
 class Login(BaseModel):
@@ -240,13 +244,44 @@ def detail(uid: int, db=Depends(session), a=Depends(admin)):
         record["total_score_after"] = total_balance
         records.append(record)
     return {
-        "user": {**next(r for r in rankings(db, current_month(db)) if r["id"] == uid), **wallet(db, uid)},
+        "user": {**next(r for r in rankings(db, current_month(db)) if r["id"] == uid), **wallet(db, uid), "is_admin": bool(db.get(User, uid).admin_id), "has_wechat": bool(db.get(User, uid).openid)},
         "exchanges": history(db, uid),
         "points": records[::-1],
         "rewards": db.scalars(
             select(Reward).where(Reward.user_id == uid).order_by(Reward.id.desc())
         ).all(),
     }
+
+
+class AdminAccessInput(BaseModel):
+    enabled: bool
+
+
+@app.post("/users/{uid}/admin")
+def set_member_admin(uid: int, body: AdminAccessInput, db=Depends(session), a=Depends(admin)):
+    member = db.scalar(select(User).where(User.id == uid).with_for_update())
+    if not member:
+        raise HTTPException(404, "用户不存在")
+    if body.enabled and not member.openid:
+        raise HTTPException(422, "该玩家尚未微信登录，无法授予微信管理员权限")
+    if bool(member.admin_id) != body.enabled:
+        if body.enabled:
+            # Each grant has its own identity so historical operation records survive revocation.
+            account = Admin(username="wx_" + secrets.token_hex(12), password_hash=passwords.hash(secrets.token_urlsafe(48)))
+            db.add(account)
+            db.flush()
+            member.admin_id = account.id
+        else:
+            member.admin_id = None
+        member.admin_granted_by = a.id
+        member.admin_changed_at = now()
+        db.commit()
+    return {"is_admin": bool(member.admin_id)}
+
+
+@app.get("/mini/staff/me")
+def mini_staff_identity(a=Depends(admin)):
+    return {"username": a.username}
 
 
 class Adjustment(Month):

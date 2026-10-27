@@ -1,7 +1,7 @@
 <view class="page staff-page"><view class="card">
  <view class="card-heading">店员扫码核销</view>
  <block wx:if="{{!authenticated}}">
-  <view class="note">使用管理后台账号登录，仅限授权店员操作。</view>
+  <view class="note">当前微信账号尚未取得管理员权限。可请管理员在后台玩家详情中授权，或使用已有后台账号登录。</view>
   <input placeholder="店员账号" value="{{username}}" maxlength="80" bindinput="usernameInput" disabled="{{busy}}"/>
   <input placeholder="密码" password value="{{password}}" maxlength="256" bindinput="passwordInput" disabled="{{busy}}"/>
   <button class="full" bindtap="login" loading="{{busy}}" disabled="{{busy}}">店员登录</button>
@@ -17,7 +17,7 @@
    <view wx:else class="note">此门票已使用或已失效，不能核销。</view>
   </view>
   <view wx:if="{{notice}}" class="success">{{notice}}</view>
-  <button class="full button-ghost" bindtap="logout" disabled="{{busy}}">退出店员账号</button>
+  <button class="full button-ghost" bindtap="logout" disabled="{{busy}}">切换店员账号</button>
  </block>
  <view wx:if="{{error}}" class="error">{{error}}</view>
 </view></view>

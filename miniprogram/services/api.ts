@@ -5,7 +5,7 @@ export const API_BASE = wx.getAccountInfoSync().miniProgram.envVersion === 'deve
  : ONLINE_API_BASE;
 export const BRAND_BACKGROUND = API_BASE + '/assets/mini/brand.png';
 export const REWARDS_BACKGROUND = API_BASE + '/assets/mini/rewards.png';
-export interface Member {nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string;available_points:number;spent_points:number}
+export interface Member {is_admin?:boolean;nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string;available_points:number;spent_points:number}
 export interface Rank {nickname:string;member_code:string;rank:number;score:number;avatar_url?:string|null;avatarUrl?:string}
 export interface Board {current_month:string;rows:Rank[]}
 export interface Reward {qr_matrix?:boolean[][];id:number;reward_name:string;status:string;issued_at:string;redeemed_at:string|null;redeemedLabel?:string;competition_id:number|null;redeem_code:string|null;source_label?:string;member_code?:string;statusLabel?:string;dateLabel?:string}
@@ -61,7 +61,7 @@ export function decorateMatch(match:Match):Match{const labels:{[key:string]:stri
 // Staff credentials are kept separate from the member's WeChat session.
 export function staffLoggedIn():boolean{return Boolean(wx.getStorageSync('staff_token'))}
 export function staffRequest<T>(path:string,method:'GET'|'POST'='GET',data?:object):Promise<T>{
- return new Promise((resolve,reject)=>wx.request({url:API_BASE+path,method,data,header:{Authorization:'Bearer '+(wx.getStorageSync('staff_token')||'')},success:r=>{
+ return new Promise((resolve,reject)=>wx.request({url:API_BASE+path,method,data,header:{Authorization:'Bearer '+(wx.getStorageSync('staff_token')||wx.getStorageSync('player_token')||'')},success:r=>{
   if(r.statusCode>=200&&r.statusCode<300){resolve(r.data as T);return}
   if(r.statusCode===401||r.statusCode===403)wx.removeStorageSync('staff_token');
   const body=r.data as {detail?:string};reject(new RequestError(typeof body.detail==='string'?body.detail:'请求失败，请稍后重试',r.statusCode));

@@ -23,6 +23,16 @@ def test_exchange_migration_preserves_existing_members_points_and_stock(tmp_path
             table.to_metadata(legacy)
     legacy.tables["prizes"]._columns.remove(legacy.tables["prizes"].c.exchange_points)
     legacy.tables["prizes"]._columns.remove(legacy.tables["prizes"].c.deleted)
+    members = legacy.tables["users"]
+    new_columns = {"admin_id", "admin_granted_by", "admin_changed_at"}
+    for constraint in list(members.constraints):
+        if any(column.name in new_columns for column in constraint.columns):
+            members.constraints.remove(constraint)
+    for foreign_key in list(members.foreign_keys):
+        if foreign_key.parent.name in new_columns:
+            members.foreign_keys.remove(foreign_key)
+    for name in new_columns:
+        members._columns.remove(members.c[name])
     legacy.tables["rewards"].c.operated_by.nullable = False
     legacy.tables["inventory_logs"].c.operator_id.nullable = False
     legacy.create_all(engine)
@@ -39,5 +49,7 @@ def test_exchange_migration_preserves_existing_members_points_and_stock(tmp_path
         assert connection.execute(text("SELECT nickname FROM users WHERE id=1")).scalar() == "existing-member"
         assert connection.execute(text("SELECT SUM(points_change) FROM point_logs WHERE user_id=1")).scalar() == 12
         assert tuple(connection.execute(text("SELECT stock,version,exchange_points FROM prizes WHERE code='REGULAR_TICKET'")).one()) == (7, 2, 5)
+        assert connection.execute(text("SELECT admin_id FROM users WHERE id=1")).scalar() is None
+    assert {"admin_id", "admin_granted_by", "admin_changed_at"}.issubset({c["name"] for c in inspect(engine).get_columns("users")})
     assert "exchange_orders" in inspect(engine).get_table_names()
     engine.dispose()

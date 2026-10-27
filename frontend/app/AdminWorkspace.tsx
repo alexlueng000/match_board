@@ -2,6 +2,7 @@
 import MatchSessions from "./MatchSessions";
 import CreatePlayerModal from "./CreatePlayerModal";
 import RedemptionDesk from "./RedemptionDesk";
+import MemberAdminAccess from "./MemberAdminAccess";
 import ManualRewardForm from "./ManualRewardForm";
 import PrizeSettings, {awardLabel} from "./PrizeSettings";
 import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
@@ -916,6 +917,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                   {detail.user.member_code} · 本月 {detail.user.monthly_score}{" "}
                   分 · 累计 {detail.user.total_score} 分
                 </p>
+                <MemberAdminAccess key={detail.user.id} member={detail.user} disabled={busy} api={api} onSaved={async () => setDetail(await api("/users/" + detail.user.id))}/>
                 <ManualRewardForm key={detail.user.id} types={types} disabled={busy} onIssue={async (body) => {
                   setBusy(true);
                   try {

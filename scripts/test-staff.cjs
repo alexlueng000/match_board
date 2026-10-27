@@ -51,3 +51,16 @@ test('member ticket renders QR matrix and removes it after redemption',async()=>
  missing=true;drawn.length=0;await page.load();callback();assert.match(page.data.error,/二维码暂不可用/);assert.equal(drawn.length,0);
  used=true;drawn.length=0;await page.load();callback();assert.equal(page.data.error,'');assert.equal(page.data.reward.qr_matrix,undefined);assert.equal(drawn.length,0);
 });
+test('authorized WeChat member enters scanner without a backend password',async()=>{
+ const t=setup();t.setHandler(o=>o.success({statusCode:200,data:{username:'wx_admin'}}));
+ await t.page.checkAccess();assert.equal(t.page.data.authenticated,true);assert.equal(t.page.data.busy,false);
+ assert.equal(t.calls[0].url,'http://127.0.0.1:8000/mini/staff/me');assert.equal(t.calls[0].header.Authorization,'Bearer member-session');
+});
+test('revoked member cannot enter scanner and keeps member login',async()=>{
+ const t=setup();t.setHandler(o=>o.success({statusCode:401,data:{detail:'无管理员权限'}}));
+ await t.page.checkAccess();assert.equal(t.page.data.authenticated,false);assert.equal(t.page.data.error,'');assert.equal(t.storage.get('player_token'),'member-session');
+});
+test('expired password session falls back to the authorized WeChat identity',async()=>{
+ const t=setup();t.storage.set('staff_token','expired');t.setHandler(o=>o.success(o.header.Authorization==='Bearer expired'?{statusCode:401,data:{detail:'过期'}}:{statusCode:200,data:{username:'wx_admin'}}));
+ await t.page.checkAccess();assert.equal(t.page.data.authenticated,true);assert.equal(t.calls.length,2);assert.equal(t.storage.has('staff_token'),false);
+});

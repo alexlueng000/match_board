@@ -1170,3 +1170,47 @@ def test_ticket_qr_staff_redemption_and_permissions(client, monkeypatch):
     with main.Session() as session:
         saved = session.get(db.Reward, first["id"])
         assert saved.redeemed_by is not None and saved.redeemed_at is not None
+
+
+def test_wechat_admin_grant_revoke_and_audit(client, monkeypatch):
+    from app import mini
+    monkeypatch.setattr(mini, "exchange_code", lambda code: "admin-test-" + code)
+    login = client.post("/mini/auth", json={"code": "staff", "nickname": "店员"}).json()
+    staff = {"Authorization": "Bearer " + login["access_token"]}
+    uid = client.get("/mini/me", headers=staff).json()["id"]
+    path = f"/users/{uid}/admin"
+    assert client.post(path, json={"enabled": True}, headers=staff).status_code == 401
+    assert client.get("/mini/staff/me", headers=staff).status_code == 401
+    assert client.post(path, json={"enabled": True}).json() == {"is_admin": True}
+    assert client.get(f"/users/{uid}").json()["user"]["has_wechat"] is True
+    assert client.get("/mini/me", headers=staff).json()["is_admin"] is True
+    # The original WeChat token acquires access without password login or reissuing a token.
+    assert client.get("/mini/staff/me", headers=staff).status_code == 200
+    assert client.get("/users", headers=staff).status_code == 200
+    with main.Session() as session:
+        member = session.get(db.User, uid)
+        aid = member.admin_id
+        assert member.admin_granted_by is not None and member.admin_changed_at is not None
+    # Repeated grant is idempotent and must not create a different operation identity.
+    assert client.post(path, json={"enabled": True}).status_code == 200
+    with main.Session() as session:
+        assert session.get(db.User, uid).admin_id == aid
+    assert client.post("/rewards", json={"user_id": uid, "reward_type": "GTO_TICKET", "reason": "核销测试"}).status_code == 200
+    reward = client.get("/mini/rewards", headers=staff).json()[0]
+    assert client.get("/rewards?code=" + reward["redeem_code"], headers=staff).status_code == 200
+    assert client.post(f"/rewards/{reward['id']}/redeem", json={}, headers=staff).status_code == 200
+    assert client.post(path, json={"enabled": False}).json() == {"is_admin": False}
+    assert client.get("/mini/staff/me", headers=staff).status_code == 401
+    assert client.get("/users", headers=staff).status_code == 401
+    assert client.post(path, json={"enabled": True}, headers=staff).status_code == 401
+    assert client.get("/mini/me", headers=staff).json()["is_admin"] is False
+    with main.Session() as session:
+        assert session.get(db.Reward, reward["id"]).redeemed_by == aid
+        assert session.get(db.Admin, aid) is not None
+    # Regrant uses a fresh identity while preserving historical redemption attribution.
+    assert client.post(path, json={"enabled": True}).status_code == 200
+    with main.Session() as session:
+        assert session.get(db.User, uid).admin_id != aid
+    offline = client.post("/users", json={"nickname": "线下玩家"}).json()["id"]
+    assert client.post(f"/users/{offline}/admin", json={"enabled": True}).status_code == 422
+    assert client.post("/users/999999/admin", json={"enabled": True}).status_code == 404
