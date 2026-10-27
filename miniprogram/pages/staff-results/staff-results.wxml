@@ -1,0 +1,43 @@
+<view class="page results-page">
+ <view wx:if="{{error}}" class="error">{{error}}</view>
+ <view wx:if="{{notice}}" class="success">{{notice}}</view>
+ <view wx:if="{{pending}}" class="card">
+  <view class="card-heading">上一次提交结果待确认</view>
+  <view class="summary">{{pending.summary}}</view>
+  <view class="note">请先确认这一笔结果；重复确认不会重复发放积分或奖励。</view>
+  <button class="full" bindtap="retry" loading="{{busy}}" disabled="{{busy || loading}}">确认上一次提交结果</button>
+ </view>
+ <view wx:else class="card">
+  <view class="card-heading">录入比赛名次</view>
+  <view class="field-label">比赛日期</view>
+  <picker mode="date" value="{{date}}" bindchange="dateChange" disabled="{{busy || loading}}"><view class="picker-field">{{date}} ›</view></picker>
+  <view class="field-label">比赛场次</view>
+  <picker range="{{sessionLabels}}" value="{{sessionIndex}}" bindchange="sessionChange" disabled="{{busy || loading || !ready}}"><view class="picker-field">{{sessionLabels[sessionIndex]}} ›</view></picker>
+  <view class="note">已创建场次请选择对应比赛，仅列出当日进行中的场次，获奖人须已确认到场。其他比赛使用独立赛事录入，避免重复记分。</view>
+  <view class="field-label">赛事类型</view>
+  <picker range="{{typeLabels}}" value="{{typeIndex}}" bindchange="typeChange" disabled="{{busy || loading || sessionIndex > 0}}"><view class="picker-field">{{typeLabels[typeIndex]}} ›</view></picker>
+  <block wx:for="{{places}}" wx:key="key">
+   <view class="field-label">{{item.label}}</view>
+   <button class="player-field button-ghost" data-key="{{item.key}}" bindtap="choose" disabled="{{busy || loading || !ready}}">{{item.player ? item.player.nickname + ' · ' + item.player.member_code : '搜索选择玩家'}} ›</button>
+  </block>
+  <block wx:if="{{typeIndex === 1}}">
+   <view class="field-label">GTO 冠军奖励</view>
+   <picker range="{{rewardLabels}}" value="{{rewardIndex}}" bindchange="rewardChange" disabled="{{busy || loading}}"><view class="picker-field">{{rewardLabels[rewardIndex]}} ›</view></picker>
+  </block>
+  <view class="note">{{typeIndex === 1 ? 'GTO：冠军10分 / 亚军6分 / 季军2分' : '常规赛：冠军5分 / 亚军3分 / 季军1分'}}。奖品按后台当前设置发放。</view>
+  <button class="full" bindtap="confirm" loading="{{busy || loading}}" disabled="{{busy || loading || !ready}}">确认名次并发放积分与奖励</button>
+  <button wx:if="{{!ready && !loading}}" class="full button-ghost" bindtap="load">重新加载</button>
+ </view>
+ <view wx:if="{{editing}}" class="overlay" bindtap="close">
+  <view class="player-panel card" catchtap="stopTap">
+   <view class="card-heading"><text>搜索选择玩家</text><text class="more" bindtap="close">关闭</text></view>
+   <input placeholder="输入昵称 / 会员 ID" value="{{search}}" bindinput="searchInput" focus maxlength="80"/>
+   <view class="note">按昵称或会员 ID 查找，最多展示80位。{{sessionIndex ? '当前仅显示本场已到场玩家。' : ''}}</view>
+   <scroll-view scroll-y class="player-list">
+    <button class="player-option button-ghost" data-id="0" bindtap="select">清除选择</button>
+    <button wx:for="{{filtered}}" wx:key="id" class="player-option button-ghost" data-id="{{item.id}}" bindtap="select">{{item.nickname}} · {{item.member_code}}</button>
+    <view wx:if="{{!filtered.length}}" class="empty">未找到匹配玩家</view>
+   </scroll-view>
+  </view>
+ </view>
+</view>

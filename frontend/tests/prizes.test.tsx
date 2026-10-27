@@ -14,7 +14,7 @@ test('后台保存奖品名称、库存、发放数量和调整原因，带上�
  });
  const user=userEvent.setup();render(<PrizeSettings api={api} onSaved={vi.fn(async()=>{})}/>);
  const name=await screen.findByLabelText('GIFT奖品名称');
- await user.type(screen.getByLabelText('GIFT兑换积分'),'12');
+ expect(screen.queryByLabelText('GIFT兑换积分')).toBeNull();
  await user.clear(name);await user.type(name,'赛事纪念杯');
  await user.click(screen.getByRole('checkbox',{name:'不限库存'}));
  const stock=screen.getByLabelText('GIFT库存');await user.clear(stock);await user.type(stock,'10');
@@ -25,7 +25,7 @@ test('后台保存奖品名称、库存、发放数量和调整原因，带上�
  expect(submitted.prizes[0]).toMatchObject({name:'赛事纪念杯',stock:10,version:5});
  expect(submitted.rules[0].quantity).toBe(2);
  expect(submitted.reason).toBe('补货10份，每次发放2份');
- expect(submitted.prizes[0].exchange_points).toBe(12);
+ expect(submitted.prizes[0]).not.toHaveProperty('exchange_points');
 });
 
 test('删除奖品通过页面弹窗确认，保留其他尚未保存的修改',async()=>{

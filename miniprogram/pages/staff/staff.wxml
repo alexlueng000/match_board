@@ -1,5 +1,5 @@
 <view class="page staff-page"><view class="card">
- <view class="card-heading">店员扫码核销</view>
+ <view class="card-heading">门店管理</view>
  <block wx:if="{{!authenticated}}">
   <view class="note">使用管理后台账号登录，仅限授权店员操作。</view>
   <input placeholder="店员账号" value="{{username}}" maxlength="80" bindinput="usernameInput" disabled="{{busy}}"/>
@@ -7,6 +7,8 @@
   <button class="full" bindtap="login" loading="{{busy}}" disabled="{{busy}}">店员登录</button>
  </block>
  <block wx:else>
+  <button class="full" bindtap="goResults" disabled="{{busy}}">赛事记分 · 录入前三名</button>
+  <view class="divider"/><view class="card-heading">店员扫码核销</view>
   <view class="note">扫描用户门票详情中的二维码，核对会员和门票后确认使用。</view>
   <button class="full" bindtap="scan" disabled="{{busy}}" loading="{{busy}}">扫码门票</button>
   <view wx:if="{{reward}}">

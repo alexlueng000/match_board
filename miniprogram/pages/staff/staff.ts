@@ -45,5 +45,6 @@ Page({
    this.setData({reward:null,error:errorMessage(error)+'；请重新扫码确认门票最新状态',authenticated:staffLoggedIn()});
   }finally{this.setData({busy:false})}
  },
+ goResults(){if(!this.data.busy)wx.navigateTo({url:'/pages/staff-results/staff-results'})},
  logout(){if(this.data.busy)return;wx.removeStorageSync('staff_token');this.setData({authenticated:false,password:'',reward:null,error:'',notice:''})}
 });

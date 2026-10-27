@@ -17,13 +17,12 @@ DEFAULT_RULES = {
 DEFAULT_RULES.update(
     {"gto_champion_tickets": ("GTO_TICKET", 2), "gto_champion_gift": ("GIFT", 1)}
 )
-EXCHANGE_PRICES = {"REGULAR_TICKET": 5, "REGULAR_50_OFF": 3, "REGULAR_70_OFF": 1, "GTO_TICKET": 6, "GTO_50_OFF": 2}
 
 
 def initialize(db):
     for code, name in REWARDS.items():
         if not db.get(Prize, code):
-            db.add(Prize(code=code, name=name, stock=None, enabled=True, version=0, exchange_points=EXCHANGE_PRICES.get(code)))
+            db.add(Prize(code=code, name=name, stock=None, enabled=True, version=0))
     db.flush()
     for key, (code, quantity) in DEFAULT_RULES.items():
         if not db.get(PrizeRule, key):

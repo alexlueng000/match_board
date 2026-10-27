@@ -25,7 +25,6 @@ Page({
  },
  login:goLogin,
  goStaff(){wx.navigateTo({url:'/pages/staff/staff'})},
- goExchange(){wx.navigateTo({url:'/pages/exchange/exchange'})},
  logout(){wx.showModal({title:'退出登录',content:'下次可通过微信重新登录，积分和奖励会保留。',success:r=>{
   if(r.confirm){wx.removeStorageSync('player_token');wx.reLaunch({url:'/pages/login/login'})}
  }})}
