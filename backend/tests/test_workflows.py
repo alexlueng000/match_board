@@ -159,58 +159,56 @@ def exchange_member(client, monkeypatch, name="exchange-member", points=10):
     return uid, headers
 
 
-def test_ticket_exchange_separate_balance_stock_idempotency_and_ownership(client, monkeypatch):
+def test_point_exchange_is_retired_without_changing_points_stock_or_rewards(client, monkeypatch):
     uid, headers = exchange_member(client, monkeypatch)
     with main.Session.begin() as session:
-        session.get(db.Prize, "REGULAR_TICKET").stock = 2
-    before = client.get(f"/users/{uid}").json()["user"]
-    catalog = client.get("/mini/exchange", headers=headers).json()
-    assert {p["code"]: p["points"] for p in catalog["items"]} == {"REGULAR_TICKET": 5, "REGULAR_50_OFF": 3, "REGULAR_70_OFF": 1, "GTO_TICKET": 6, "GTO_50_OFF": 2}
-    assert catalog["available_points"] == 10
-    body = {"request_id": "purchase-request-1", "prize_code": "REGULAR_TICKET", "expected_points": 5}
-    response = client.post("/mini/exchange", json=body, headers=headers)
-    assert response.status_code == 200
-    rid = response.json()["reward_id"]
-    assert client.post("/mini/exchange", json=body, headers=headers).json() == {"reward_id": rid, "duplicate": True}
-    assert client.post("/mini/exchange", json={**body, "prize_code": "GTO_TICKET"}, headers=headers).status_code == 409
-    after = client.get(f"/users/{uid}").json()
-    assert after["user"]["total_score"] == before["total_score"]
-    assert after["user"]["monthly_score"] == before["monthly_score"]
-    assert after["user"]["available_points"] == 5
-    assert len(after["exchanges"]) == len(after["rewards"]) == 1
+        prize = session.get(db.Prize, "REGULAR_TICKET")
+        prize.stock = 2
+        # Even an old configured exchange price cannot enable purchases.
+        prize.exchange_points = 5
+    body = {"request_id": "retired-exchange-1", "prize_code": "REGULAR_TICKET", "expected_points": 5}
+    for method in ["GET", "POST"]:
+        response = client.request(method, "/mini/exchange", headers=headers, **({"json": body} if method == "POST" else {}))
+        assert response.status_code == 410
+        assert "按比赛名次直接发放" in response.json()["detail"]
+    member = client.get(f"/users/{uid}").json()
+    assert member["user"]["total_score"] == 10
+    assert member["rewards"] == [] and member["exchanges"] == []
     with main.Session() as session:
-        assert session.get(db.Prize, "REGULAR_TICKET").stock == 1
-        reward = session.get(db.Reward, rid)
-        assert reward.operated_by is None and reward.stock_reserved
-    reward = client.get(f"/mini/rewards/{rid}", headers=headers).json()
-    assert reward["source_label"] == "积分兑换" and reward["member_code"]
-    _, other = exchange_member(client, monkeypatch, "another-member", points=0)
-    assert client.get(f"/mini/rewards/{rid}", headers=other).status_code == 404
-    assert client.get("/mini/exchange", headers={"Authorization": ""}).status_code in (401, 403)
-    assert client.post("/mini/exchange", json=body).status_code == 401
-
-
-def test_ticket_exchange_failure_has_no_partial_debit_or_reward(client, monkeypatch):
-    uid, headers = exchange_member(client, monkeypatch, points=4)
-    body = {"request_id": "purchase-failure-1", "prize_code": "REGULAR_TICKET", "expected_points": 5}
-    assert client.post("/mini/exchange", json=body, headers=headers).status_code == 409
-    assert client.get(f"/users/{uid}").json()["rewards"] == []
-    client.post(f"/users/{uid}/points", json={"points": 10, "month": "2026-10", "reason": "补录"})
-    with main.Session.begin() as session:
-        session.get(db.Prize, "REGULAR_TICKET").stock = 0
-    assert client.post("/mini/exchange", json=body, headers=headers).status_code == 409
-    with main.Session.begin() as session:
-        session.get(db.Prize, "REGULAR_TICKET").stock = 3
-        session.get(db.Prize, "REGULAR_TICKET").exchange_points = 6
-    assert client.post("/mini/exchange", json=body, headers=headers).status_code == 409
-    with main.Session.begin() as session:
-        session.get(db.Prize, "REGULAR_TICKET").exchange_points = None
-    assert client.post("/mini/exchange", json={**body, "expected_points": 6}, headers=headers).status_code == 409
-    assert client.get("/mini/exchange", headers=headers).json()["available_points"] == 14
-    with main.Session() as session:
+        assert session.get(db.Prize, "REGULAR_TICKET").stock == 2
         assert session.scalar(select(func.count()).select_from(db.ExchangeOrder)) == 0
-        assert session.scalar(select(func.count()).select_from(db.Reward)) == 0
-        assert session.get(db.Prize, "REGULAR_TICKET").stock == 3
+    assert client.post("/mini/exchange", json=body, headers={"Authorization": ""}).status_code in (401, 403)
+
+
+@pytest.mark.parametrize("event_type,choice,points,reward_types", [
+    ("regular", None, [5, 3, 1, 0], [["REGULAR_TICKET"], ["REGULAR_50_OFF"], ["REGULAR_70_OFF"], ["REGULAR_50_OFF"]]),
+    ("gto", "tickets", [10, 6, 2, 0], [["GTO_TICKET", "GTO_TICKET"], ["GTO_TICKET"], ["GTO_50_OFF"], ["GTO_50_OFF"]]),
+    ("gto", "gift", [10, 6, 2, 0], [["GIFT"], ["GTO_TICKET"], ["GTO_50_OFF"], ["GTO_50_OFF"]]),
+])
+def test_results_directly_award_rank_tickets_without_spending_points(client, event_type, choice, points, reward_types):
+    winners = players(client) + [client.post("/users", json={"nickname": "27收池玩家"}).json()["id"]]
+    payload = dict(request_id="rank-awards-" + event_type + str(choice), type=event_type, date="2026-10-27",
+                   champion=winners[0], second=winners[1], third=winners[2], pool27=winners[3])
+    if choice:
+        payload["champion_reward"] = choice
+    response = client.post("/competitions", json=payload)
+    assert response.status_code == 200
+    assert client.post("/competitions", json=payload).json()["duplicate"] is True
+    for uid, score, codes in zip(winners, points, reward_types):
+        member = client.get(f"/users/{uid}").json()
+        assert member["user"]["total_score"] == score
+        assert sorted(r["reward_type"] for r in member["rewards"]) == sorted(codes)
+        assert all(r["competition_id"] == response.json()["id"] and r["status"] == "pending" for r in member["rewards"])
+        assert member["exchanges"] == []
+
+
+def legacy_exchange_ticket(uid, request_id):
+    # Seed historical purchases directly; current APIs cannot create new ones.
+    from app.prizes import reserve
+    with main.Session.begin() as session:
+        reward = reserve(session, uid, "REGULAR_TICKET", None, remark="历史积分兑换")
+        session.add(db.ExchangeOrder(user_id=uid, request_id=request_id, prize_code="REGULAR_TICKET", reward_id=reward.id, points=5))
+        return reward.id
 
 
 def test_cancel_exchange_refunds_only_unused_ticket(client, monkeypatch):
@@ -218,17 +216,17 @@ def test_cancel_exchange_refunds_only_unused_ticket(client, monkeypatch):
     with main.Session.begin() as session:
         session.get(db.Prize, "REGULAR_TICKET").stock = 2
     body = {"request_id": "exchange-refund-1", "prize_code": "REGULAR_TICKET", "expected_points": 5}
-    rid = client.post("/mini/exchange", json=body, headers=headers).json()["reward_id"]
+    rid = legacy_exchange_ticket(uid, body["request_id"])
     assert client.post(f"/rewards/{rid}/cancel", json={"reason": "退回未使用门票"}).status_code == 200
     assert client.post(f"/rewards/{rid}/cancel", json={"reason": "重复撤销"}).status_code == 409
-    wallet = client.get("/mini/exchange", headers=headers).json()
+    wallet = client.get(f"/users/{uid}/exchange").json()
     assert wallet["available_points"] == 10 and wallet["spent_points"] == 0
     assert wallet["history"][0]["refunded_at"]
-    assert client.post("/mini/exchange", json=body, headers=headers).json()["duplicate"] is True
-    rid2 = client.post("/mini/exchange", json={**body, "request_id": "exchange-refund-2"}, headers=headers).json()["reward_id"]
+    assert client.post("/mini/exchange", json=body, headers=headers).status_code == 410
+    rid2 = legacy_exchange_ticket(uid, "exchange-refund-2")
     assert client.post(f"/rewards/{rid2}/redeem", json={}).status_code == 200
     assert client.post(f"/rewards/{rid2}/cancel", json={"reason": "不能退已使用票"}).status_code == 409
-    assert client.get("/mini/exchange", headers=headers).json()["available_points"] == 5
+    assert client.get(f"/users/{uid}/exchange").json()["available_points"] == 5
     with main.Session() as session:
         assert session.get(db.Prize, "REGULAR_TICKET").stock == 1
 
@@ -265,7 +263,7 @@ def test_delete_prize_preserves_rewards_refunds_stock_and_rejects_stale_restore(
     assert client.post("/prizes/CUSTOM_DELETE/delete", json={"version": prize["version"], "reason": "  不再提供  "}).status_code == 200
     assert "CUSTOM_DELETE" not in client.get("/reward-types").json()
     assert all(p["code"] != "CUSTOM_DELETE" for p in client.get("/prize-settings").json()["prizes"])
-    assert all(p["code"] != "CUSTOM_DELETE" for p in client.get("/mini/exchange", headers=headers).json()["items"])
+    assert client.get("/mini/exchange", headers=headers).status_code == 410
     assert client.post("/prize-settings", json={**old, "reason": "旧页面保存"}).status_code == 409
     assert client.post("/rewards", json={"user_id": uid, "reward_type": "CUSTOM_DELETE", "reason": "不能继续发放"}).status_code == 422
     historical = client.get(f"/rewards?user_id={uid}").json()
@@ -299,17 +297,17 @@ def test_delete_prize_requires_stopped_award_rules_and_survives_initialization(c
 
 
 @pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason="requires a dedicated MySQL test database")
-def test_mysql_parallel_exchange_cannot_overspend(client, monkeypatch):
+def test_mysql_parallel_retired_exchange_cannot_spend(client, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     uid, headers = exchange_member(client, monkeypatch, points=10)
     def purchase(index):
         return client.post("/mini/exchange", headers=headers, json={"request_id": f"parallel-exchange-{index}", "prize_code": "GTO_TICKET", "expected_points": 6}).status_code
     with ThreadPoolExecutor(max_workers=2) as pool:
         statuses = list(pool.map(purchase, range(2)))
-    assert sorted(statuses) == [200, 409]
+    assert sorted(statuses) == [410, 410]
     with main.Session() as session:
-        assert session.scalar(select(func.count()).select_from(db.ExchangeOrder).where(db.ExchangeOrder.user_id == uid)) == 1
-    assert client.get("/mini/exchange", headers=headers).json()["available_points"] == 4
+        assert session.scalar(select(func.count()).select_from(db.ExchangeOrder).where(db.ExchangeOrder.user_id == uid)) == 0
+    assert client.get(f"/users/{uid}/exchange").json()["available_points"] == 10
 
 
 def test_transaction_idempotency_month_and_rewards(client):

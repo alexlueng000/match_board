@@ -56,6 +56,9 @@ label {
   gap: 10px;
   color: #5e655f;
 }
+.player-select { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.player-select > label { display: block; }
+.player-select > small { margin-top: 0; }
 small {
   display: block;
   color: var(--muted);

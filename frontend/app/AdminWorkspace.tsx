@@ -1,6 +1,7 @@
 "use client";
 import MatchSessions from "./MatchSessions";
 import CreatePlayerModal from "./CreatePlayerModal";
+import PlayerSelect from "./PlayerSelect";
 import RedemptionDesk from "./RedemptionDesk";
 import MemberAdminAccess from "./MemberAdminAccess";
 import ManualRewardForm from "./ManualRewardForm";
@@ -179,18 +180,7 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
     }
   }
   const selectPlayer = (name: string, label: string, required = true) => (
-    <label>
-      {label}
-      {required && <b className="required"> *</b>}
-      <select name={name} required={required} defaultValue="">
-        <option value="">选择玩家</option>
-        {players.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.nickname} · {p.member_code}
-          </option>
-        ))}
-      </select>
-    </label>
+    <PlayerSelect name={name} label={label} required={required} players={players as {id:number; nickname:string; member_code:string}[]} />
   );
   const rewardTable = (rows: Row[]) => (
     <div className="table-wrap">
@@ -928,7 +918,6 @@ export default function AdminWorkspace({ sessionId }: { sessionId?: number }) {
                   } finally { setBusy(false); }
                 }}/>
                 <h3>积分调整</h3>
-                <p className="muted">可用积分：{detail.user.available_points ?? detail.user.total_score} · 兑换已消费：{detail.user.spent_points ?? 0} 分（兑换不影响排行榜）</p>
                 <p className="muted">正数加分，负数扣分；调整会同时计入归属月份和累计总积分，并保留操作流水。</p>
                 <form
                   className="form-grid"

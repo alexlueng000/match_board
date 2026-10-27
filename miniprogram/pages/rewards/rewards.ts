@@ -3,6 +3,5 @@ Page({data:{background:REWARDS_BACKGROUND,tab:'pending',all:[] as Reward[],rows:
  async load(){this.setData({error:'',hasLogin:loggedIn(),loading:true,all:[],rows:[]});if(!loggedIn()){this.setData({loading:false});return}try{const all=(await request<Reward[]>('/rewards')).map(decorateReward);this.setData({all});this.filter()}catch(e){this.setData({error:errorMessage(e),hasLogin:loggedIn()})}finally{this.setData({loading:false})}},
  filter(){this.setData({rows:this.data.all.filter(r=>this.data.tab==='inactive'?['cancelled','expired'].includes(r.status):r.status===this.data.tab)})},
  changeTab(e:WechatMiniprogram.TouchEvent){this.setData({tab:e.currentTarget.dataset.tab});this.filter()},login:goLogin,
- goExchange(){wx.navigateTo({url:'/pages/exchange/exchange'})},
  openReward(e:WechatMiniprogram.TouchEvent){wx.navigateTo({url:'/pages/reward-detail/reward-detail?id='+e.currentTarget.dataset.id})}
 });

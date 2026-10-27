@@ -5,7 +5,7 @@ export const API_BASE = wx.getAccountInfoSync().miniProgram.envVersion === 'deve
  : ONLINE_API_BASE;
 export const BRAND_BACKGROUND = API_BASE + '/assets/mini/brand.png';
 export const REWARDS_BACKGROUND = API_BASE + '/assets/mini/rewards.png';
-export interface Member {is_admin?:boolean;nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string;available_points:number;spent_points:number}
+export interface Member {is_admin?:boolean;nickname:string;avatar_url:string|null;profile_complete:boolean;member_code:string;monthly_score:number;total_score:number;monthly_rank:number;total_rank:number;current_month:string}
 export interface Rank {nickname:string;member_code:string;rank:number;score:number;avatar_url?:string|null;avatarUrl?:string}
 export interface Board {current_month:string;rows:Rank[]}
 export interface Reward {qr_matrix?:boolean[][];id:number;reward_name:string;status:string;issued_at:string;redeemed_at:string|null;redeemedLabel?:string;competition_id:number|null;redeem_code:string|null;source_label?:string;member_code?:string;statusLabel?:string;dateLabel?:string}

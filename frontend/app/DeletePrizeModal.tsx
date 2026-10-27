@@ -36,7 +36,7 @@ export default function DeletePrizeModal({name, onClose, onDelete}: {
     }}>
       <div className="card-heading"><h2>删除奖品</h2></div>
       <p>确认删除“{name || "未命名奖品"}”？</p>
-      <p className="muted">删除后不再发放或兑换，已发奖励和库存流水仍保留。比赛规则仍在使用的奖品需先替换或停止发放。</p>
+      <p className="muted">删除后不再发放，已发奖励和库存流水仍保留。比赛规则仍在使用的奖品需先替换或停止发放。</p>
       <form onSubmit={submit} noValidate>
         <label>删除原因<input value={reason} maxLength={480} disabled={pending} onChange={e => setReason(e.target.value)} placeholder="例如：重复添加、奖品不再提供"/></label>
         {error && <div className="error" role="alert">{error}</div>}
