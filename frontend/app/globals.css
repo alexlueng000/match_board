@@ -59,6 +59,14 @@ label {
 .player-select { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .player-select > label { display: block; }
 .player-select > small { margin-top: 0; }
+.player-search { position: relative; }
+.player-search > input { width: 100%; }
+.player-options { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: 260px; overflow-y: auto; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 18px #22292520; padding: 4px; }
+.player-options > button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; text-align: left; background: white; color: var(--ink); padding: 10px 12px; }
+.player-options > button:hover, .player-options > button.active { background: #f5efe3; }
+.player-options small { margin: 0; }
+.player-no-results { padding: 14px 12px; color: var(--muted); }
+.card:has(.player-select) { overflow: visible; }
 small {
   display: block;
   color: var(--muted);
